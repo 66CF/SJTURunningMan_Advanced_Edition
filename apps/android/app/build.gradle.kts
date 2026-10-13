@@ -16,6 +16,12 @@ val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASSWOR
 val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").orNull
 
+// 版本号：由发布流水线按 tag 注入（见 .github/workflows/release.yml）。
+// 本地不传这两个属性时沿用下面的默认值，因此本地开发行为不受影响。
+// versionCode 约定为 major*10000 + minor*100 + patch，必须是整数且只增不减。
+val appVersionName = providers.gradleProperty("APP_VERSION_NAME").orNull ?: "4.5.0"
+val appVersionCode = providers.gradleProperty("APP_VERSION_CODE").orNull?.toIntOrNull() ?: 40500
+
 android {
     namespace = "com.sjtu.runner"
     compileSdk = 34
@@ -24,8 +30,8 @@ android {
         applicationId = "com.sjtu.runner"
         minSdk = 26
         targetSdk = 34
-        versionCode = 40500
-        versionName = "4.5.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildFeatures {

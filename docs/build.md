@@ -52,7 +52,43 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 
 ### 自动发布流水线
 
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) 在推送 `v*` tag 或手动 `workflow_dispatch` 时触发，并行构建 Windows / macOS / Linux 三个产物并生成草稿 Release。Python 版本固定 3.14.6。
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) 在推送 `v*` tag 或手动 `workflow_dispatch` 时触发，并行构建五个产物并生成草稿 Release：
+
+| 产物 | 运行环境 |
+| --- | --- |
+| `SJTURunningMan_<ver>_windows.exe` | windows-latest |
+| `SJTURunningMan_<ver>_macOS.dmg` | macos-latest（universal2） |
+| `SJTURunningMan_<ver>_linux_amd64.deb` | ubuntu-24.04 |
+| `SJTURunningMan_<ver>_linux_arm64.deb` | ubuntu-24.04-arm |
+| `SJTURunningMan_<ver>_android.apk` | ubuntu-latest（自签名） |
+
+Python 版本固定 3.14.6。两个 deb 都构建在 Ubuntu 24.04 上 —— PySide6 的 aarch64 wheel 是 `manylinux_2_39`，要求 glibc ≥ 2.39，22.04 装不上。
+
+### 发布前需要配置的 Secrets
+
+安卓产物是**自签名**的，签名材料必须放在仓库 Secrets 里，否则 `build-android` 作业会直接失败（不会退化成未签名包 —— 那种包装不上，发出去更糟）：
+
+| Secret | 内容 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | keystore 文件的 base64（**单行，不要换行**） |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore 口令 |
+| `ANDROID_KEY_ALIAS` | 密钥别名 |
+| `ANDROID_KEY_PASSWORD` | 密钥口令 |
+
+生成并配置：
+
+```bash
+keytool -genkeypair -v \
+  -keystore release.jks -alias sjturunningman \
+  -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
+
+base64 -i release.jks | tr -d '\n' | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+> ⚠️ **务必留存 `release.jks` 与两个口令。** 换了 keystore 就等于换了签名，之后发的 APK 无法覆盖安装到已有用户的设备上，只能卸载重装。
 
 ---
 
