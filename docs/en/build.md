@@ -52,7 +52,43 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 
 ### Automated release
 
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml) runs on `v*` tags or manual `workflow_dispatch`, builds Windows / macOS / Linux in parallel and creates a draft Release. Python is pinned to 3.14.6.
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) runs on `v*` tags or manual `workflow_dispatch` and builds five artifacts in parallel into a draft Release:
+
+| Artifact | Runner |
+| --- | --- |
+| `SJTURunningMan_<ver>_windows.exe` | windows-latest |
+| `SJTURunningMan_<ver>_macOS.dmg` | macos-latest (universal2) |
+| `SJTURunningMan_<ver>_linux_amd64.deb` | ubuntu-24.04 |
+| `SJTURunningMan_<ver>_linux_arm64.deb` | ubuntu-24.04-arm |
+| `SJTURunningMan_<ver>_android.apk` | ubuntu-latest (self-signed) |
+
+Python is pinned to 3.14.6. Both debs are built on Ubuntu 24.04 — PySide6's aarch64 wheel is `manylinux_2_39`, requiring glibc ≥ 2.39, which 22.04 does not provide.
+
+### Secrets required before releasing
+
+The Android artifact is **self-signed**, so the signing material must live in repository Secrets. Without them the `build-android` job fails outright (it does not fall back to an unsigned APK — that cannot be installed, which is worse than a failed build):
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | base64 of the keystore file (**single line, no wrapping**) |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password |
+| `ANDROID_KEY_ALIAS` | key alias |
+| `ANDROID_KEY_PASSWORD` | key password |
+
+Set them up with:
+
+```bash
+keytool -genkeypair -v \
+  -keystore release.jks -alias sjturunningman \
+  -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
+
+base64 -i release.jks | tr -d '\n' | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+> ⚠️ **Keep `release.jks` and both passwords safe.** Changing the keystore changes the signature, and APKs signed with the new key cannot be installed over an existing one — users would have to uninstall first.
 
 ---
 
