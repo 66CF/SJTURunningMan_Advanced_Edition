@@ -5,13 +5,14 @@ import android.os.Bundle
 import android.webkit.CookieManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModelProvider
 import com.sjtu.runner.login.LoginActivity
 import com.sjtu.runner.route.RouteDesignActivity
 import com.sjtu.runner.ui.MainScreen
+import com.sjtu.runner.ui.theme.SJtuRunnerTheme
 import com.sjtu.runner.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == RESULT_OK) {
             logMsg("重新登录成功，重新加载界面...")
             setContent {
-                AppContent()   // 抽取出 Composable 函数
+                AppContent()
             }
         } else {
             logMsg("重新登录失败")
@@ -60,8 +61,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
-        // 设置重新登录回调（ViewModel 触发重新登录时调用）
         viewModel.onReloginRequired = {
             runOnUiThread {
                 logMsg("检测到cookie过期，正在重新登录...")
@@ -80,10 +81,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 将界面内容抽成一个独立的 @Composable 函数，避免在 lambda 内部直接调用带参数的 MainScreen
     @Composable
     private fun AppContent() {
-        MaterialTheme {
+        SJtuRunnerTheme {
             MainScreen(
                 viewModel = viewModel,
                 onNavigateToRouteDesign = {

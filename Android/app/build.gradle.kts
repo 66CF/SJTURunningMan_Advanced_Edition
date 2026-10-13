@@ -13,8 +13,8 @@ android {
         applicationId = "com.sjtu.runner"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "4.2.0"
+        versionCode = 40500
+        versionName = "4.5.0"
     }
 
     buildFeatures {
@@ -34,7 +34,6 @@ android {
 dependencies {
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.01.00")
-    implementation("com.google.code.gson:gson:2.10.1")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -58,4 +57,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation(libs.junit)
+
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("io.coil-kt:coil-gif:2.5.0")
 }

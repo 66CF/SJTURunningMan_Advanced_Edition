@@ -1,10 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
+    <color name="sjtu_blue">#0B6BA5</color>
+    <color name="sjtu_blue_light">#8FCBF2</color>
+    <color name="sjtu_blue_dark">#004B71</color>
+    <color name="sjtu_orange">#8D4E00</color>
+    <color name="sjtu_orange_light">#FFB684</color>
+
+    <color name="surface_light">#F6F8FB</color>
+    <color name="surface_dark">#11151A</color>
+    <color name="surface_high_light">#FFFFFF</color>
+    <color name="surface_low_light">#EDF1F6</color>
+    <color name="surface_variant_light">#DDE3EA</color>
+
+    <color name="background_light">#F6F8FB</color>
+    <color name="background_dark">#11151A</color>
+
+    <color name="card_light">#FFFFFF</color>
+    <color name="card_dark">#1B2027</color>
+
+    <color name="success_green">#10B981</color>
+    <color name="warning_yellow">#F59E0B</color>
+    <color name="error_red">#BA1A1A</color>
+    <color name="info_blue">#3B82F6</color>
+
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_surface_light">#181C20</color>
+    <color name="on_surface_dark">#E1E7ED</color>
+    <color name="on_background_light">#181C20</color>
+    <color name="on_background_dark">#E1E7ED</color>
+
+    <color name="text_secondary_light">#40484E</color>
+    <color name="text_secondary_dark">#BFC8CF</color>
+
+    <color name="border_light">#C1C8CE</color>
+    <color name="border_dark">#3E464C</color>
+
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="transparent">#00000000</color>
 </resources>

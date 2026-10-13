@@ -1,7 +1,9 @@
 package com.sjtu.runner.route
 
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -11,14 +13,17 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
-import com.sjtu.runner.viewmodel.MainViewModel
+import com.sjtu.runner.ui.theme.SJtuRunnerTheme
 import kotlinx.coroutines.launch
 
 class RouteDesignActivity : ComponentActivity() {
@@ -36,10 +41,11 @@ class RouteDesignActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setupSystemBars()
         routeManager = RouteManager(this)
 
         setContent {
-            MaterialTheme {
+            SJtuRunnerTheme {
                 RouteDesignScreen(
                     onBackPressed = { finish() }
                 )
@@ -47,24 +53,51 @@ class RouteDesignActivity : ComponentActivity() {
         }
     }
 
+    private fun setupSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun RouteDesignScreen(onBackPressed: () -> Unit) {
         Scaffold(
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text("设计路线", color = MaterialTheme.colorScheme.onPrimaryContainer) },
-                    navigationIcon = {
-                        IconButton(onClick = onBackPressed) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.Map,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("设计跑步路线", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "点击地图添加坐标点",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    navigationIcon = {
+                        IconButton(onClick = onBackPressed) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                     )
                 )
-            }
+            },
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Box(
                 modifier = Modifier
@@ -82,12 +115,22 @@ class RouteDesignActivity : ComponentActivity() {
                             settings.domStorageEnabled = true
                             settings.loadWithOverviewMode = true
                             settings.useWideViewPort = true
+                            settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
+                            settings.mediaPlaybackRequiresUserGesture = false
+
+                            setOnTouchListener { v, event ->
+                                when (event.action) {
+                                    MotionEvent.ACTION_DOWN -> {
+                                        v.requestFocus()
+                                        false
+                                    }
+                                    else -> false
+                                }
+                            }
 
                             webViewClient = WebViewClient()
 
                             addJavascriptInterface(AndroidBridge(), "AndroidInterface")
-
-                            // 加载 assets 中的 HTML
                             loadUrl("file:///android_asset/route_design.html")
                         }.also { webView = it }
                     },
@@ -109,6 +152,7 @@ class RouteDesignActivity : ComponentActivity() {
                         val points = parsePointsJson(pointsJson)
                         if (points.isEmpty()) {
                             Toast.makeText(this@RouteDesignActivity, "坐标点无效", Toast.LENGTH_SHORT).show()
+                            isSaving = false
                             return@launch
                         }
 
@@ -116,7 +160,7 @@ class RouteDesignActivity : ComponentActivity() {
                         if (route != null) {
                             Toast.makeText(
                                 this@RouteDesignActivity,
-                                "路线「${route.name}」保存成功！共${points.size}个点",
+                                "路线保存成功！共${points.size}个点",
                                 Toast.LENGTH_LONG
                             ).show()
 
@@ -128,10 +172,10 @@ class RouteDesignActivity : ComponentActivity() {
                             finish()
                         } else {
                             Toast.makeText(this@RouteDesignActivity, "保存失败", Toast.LENGTH_SHORT).show()
+                            isSaving = false
                         }
                     } catch (e: Exception) {
                         Toast.makeText(this@RouteDesignActivity, "保存出错: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
                         isSaving = false
                     }
                 }

@@ -3,14 +3,22 @@ package com.sjtu.runner.login
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class LoginActivity : Activity() {
 
@@ -24,26 +32,49 @@ class LoginActivity : Activity() {
                 "&state=8" +
                 "&redirect_uri=https://pe.sjtu.edu.cn/oauth2Login"
         private const val MOBILE_USER_AGENT =
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) " +
-                    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 " +
-                    "Mobile/15E148 Safari/604.1 Edg/89.0.4389.72"
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) " +
+                    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 " +
+                    "Mobile/15E148 Safari/604.1"
     }
+
+    private lateinit var webView: WebView
+    private lateinit var progressBar: ProgressBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setupSystemBars()
 
-        val webView = WebView(this).apply {
+        val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val backgroundColor = if (isDarkMode) {
+            android.graphics.Color.parseColor("#121212")
+        } else {
+            android.graphics.Color.parseColor("#F8FAFC")
+        }
+
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(backgroundColor)
+        }
+
+        progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = true
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                8.dpToPx()
+            ).apply { topMargin = 0 }
+        }
+
+        webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.userAgentString = MOBILE_USER_AGENT
+            settings.loadWithOverviewMode = true
+            settings.useWideViewPort = true
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
             webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(
-                    view: WebView?,
-                    request: WebResourceRequest?
-                ): Boolean {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val uri = request?.url ?: return false
                     return handleExternalLoginScheme(uri)
                 }
@@ -54,66 +85,71 @@ class LoginActivity : Activity() {
                     return handleExternalLoginScheme(uri)
                 }
 
+                override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    progressBar.visibility = View.VISIBLE
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    progressBar.visibility = View.GONE
                     Log.d(TAG, "onPageFinished: $url")
-                    
-                    // Check if we have cookies for pe.sjtu.edu.cn
+
                     val cookies = CookieManager.getInstance().getCookie("https://pe.sjtu.edu.cn")
-                    Log.d(TAG, "Cookies for pe.sjtu.edu.cn: $cookies")
-                    
-                    // Check if we have cookies for jaccount.sjtu.edu.cn
                     val jaccountCookies = CookieManager.getInstance().getCookie("https://jaccount.sjtu.edu.cn")
+                    Log.d(TAG, "Cookies for pe.sjtu.edu.cn: $cookies")
                     Log.d(TAG, "Cookies for jaccount.sjtu.edu.cn: $jaccountCookies")
-                    
-                    // Check if login is complete by looking for specific cookies or URL patterns
+
                     val isLoginComplete = when {
-                        // Case 1: 跳转到OAuth授权回调页（最核心、最可靠的判断）
-                        url?.startsWith("https://pe.sjtu.edu.cn/oauth2Login") == true -> {
-                            Log.d(TAG, "Detected oauth2Login page")
-                            true
-                        }
-                        // Case 2: 拿到体育学院的会话Cookie JSESSIONID（API请求必需）
-                        !cookies.isNullOrBlank() && cookies.contains("JSESSIONID") -> {
-                            Log.d(TAG, "Detected pe.sjtu.edu.cn session cookie")
-                            true
-                        }
-                        // Case 3: 成功跳转到体育学院主站页面（非登录、非授权页）
+                        url?.startsWith("https://pe.sjtu.edu.cn/oauth2Login") == true -> true
+                        !cookies.isNullOrBlank() && cookies.contains("JSESSIONID") -> true
                         url?.startsWith("https://pe.sjtu.edu.cn") == true &&
                                 !url.contains("oauth2/authorize") &&
-                                !url.contains("jaccount") -> {
-                            Log.d(TAG, "Detected pe.sjtu.edu.cn page after login")
-                            true
-                        }
-                        // ❌ 已删除：仅JAAuthCookie就判定登录完成（导致二次验证提前跳转）
+                                !url.contains("jaccount") -> true
                         else -> false
                     }
 
-                    
                     if (isLoginComplete) {
                         Log.d(TAG, "Login complete, finishing activity")
                         setResult(RESULT_OK)
                         finish()
                     }
                 }
-                
             }
-        }
-        setContentView(webView)
 
-        // Clear any existing cookies to start fresh
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        container.addView(progressBar)
+        container.addView(webView)
+        setContentView(container)
+
         CookieManager.getInstance().removeAllCookies(null)
         CookieManager.getInstance().flush()
-        
         webView.loadUrl(LOGIN_URL)
     }
+
+    private fun setupSystemBars() {
+        val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isDarkMode
+            isAppearanceLightNavigationBars = !isDarkMode
+        }
+    }
+
+    private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     private fun handleExternalLoginScheme(uri: Uri): Boolean {
         val scheme = uri.scheme ?: return false
         if (scheme.equals(JACCOUNT_SCHEME, ignoreCase = true)) {
             return openJwbLogin(uri)
         }
-
-        // Avoid WebView error pages for app-only schemes while keeping normal web navigation intact.
         return scheme != "http" && scheme != "https"
     }
 
