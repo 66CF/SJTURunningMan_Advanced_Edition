@@ -1,12 +1,7 @@
 package com.sjtu.runner.ui
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,18 +65,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.decode.GifDecoder
-import coil.request.ImageRequest
 import com.sjtu.runner.config.AppConfig
 import com.sjtu.runner.ui.components.AboutDialog
 import com.sjtu.runner.ui.components.ChoiceChips
@@ -102,7 +92,6 @@ import com.sjtu.runner.ui.theme.LocalAppColors
 import com.sjtu.runner.viewmodel.MainViewModel
 import com.sjtu.runner.viewmodel.RouteDecision
 import com.sjtu.runner.viewmodel.RunConfig
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -112,7 +101,7 @@ import java.time.format.DateTimeFormatter
 private const val PREFS = "app_prefs"
 private const val KEY_COMMITMENT_ACCEPTED = "commitment_accepted"
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -150,7 +139,6 @@ fun MainScreen(
     var showAbout by remember { mutableStateOf(false) }
     var routeToDelete by remember { mutableStateOf<com.sjtu.runner.route.RouteInfo?>(null) }
     var commitmentAccepted by remember { mutableStateOf(prefs.getBoolean(KEY_COMMITMENT_ACCEPTED, false)) }
-    var showGif by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -187,11 +175,7 @@ fun MainScreen(
                 TopAppBar(
                     title = {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.combinedClickable(
-                                onClick = {},
-                                onDoubleClick = { showGif = true }
-                            )
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.DirectionsRun,
@@ -479,10 +463,6 @@ fun MainScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-
-        if (showGif) {
-            SurpriseOverlay(onDismiss = { showGif = false })
-        }
     }
 
     if (showDatePicker) {
@@ -667,38 +647,5 @@ private fun ReloginBanner(onRelogin: () -> Unit) {
             Spacer(modifier = Modifier.width(10.dp))
             FilledTonalButton(onClick = onRelogin) { Text("登录") }
         }
-    }
-}
-
-@Composable
-private fun SurpriseOverlay(onDismiss: () -> Unit) {
-    val scale by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "gifScale"
-    )
-    LaunchedEffect(Unit) {
-        delay(10_000)
-        onDismiss()
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data("file:///android_asset/surprise.gif")
-                .decoderFactory { result, options, _ -> GifDecoder(result.source, options) }
-                .build(),
-            contentDescription = null,
-            modifier = Modifier
-                .size(300.dp)
-                .scale(scale)
-                .clip(RoundedCornerShape(20.dp)),
-            contentScale = ContentScale.Fit
-        )
     }
 }
