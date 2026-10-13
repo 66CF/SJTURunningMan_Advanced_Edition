@@ -57,6 +57,15 @@ jobs:
           print("core imports OK, version =", src.config.global_version)
           PY
 
+      - name: 安装 Qt 运行库
+        # runner 默认没有这些库，PySide6 加载 QtCore 时会报
+        # ImportError: libEGL.so.1: cannot open shared object file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
+            libxcb-cursor0 libxcb-xinerama0
+
       - name: 界面模块导入（offscreen）
         env:
           QT_QPA_PLATFORM: offscreen
