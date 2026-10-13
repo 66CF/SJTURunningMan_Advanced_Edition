@@ -36,6 +36,7 @@
 | 平台 | 版本 | 安装方式 | 文档 |
 | --- | --- | --- | --- |
 | **电脑版**（Windows / macOS / Linux） | `v4.5.0` | 下载 exe / dmg / deb 直接运行 | [docs/desktop.md](docs/desktop.md) |
+| **macOS 安装** | `v4.5.0` | 需处理首次打开的 Gatekeeper 拦截 | [docs/macos.md](docs/macos.md) |
 | **安卓** | `4.5.0` | 下载 APK 安装 | [docs/android.md](docs/android.md) |
 | **iOS** | `4.5.0` | 用 Xcode 自行编译安装 | [docs/ios.md](docs/ios.md) |
 | **鸿蒙 NEXT** | `4.2.0` | HAP + 调试证书安装 | [docs/harmonyos.md](docs/harmonyos.md) |
