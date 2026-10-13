@@ -5,6 +5,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.parcelize")
 }
 
+// 可选的 release 签名：在 ~/.gradle/gradle.properties 里配置下面四项即可启用
+//   RELEASE_KEYSTORE_FILE=/absolute/path/to/GenerateAPK.jks
+//   RELEASE_KEYSTORE_PASSWORD=...
+//   RELEASE_KEY_ALIAS=...
+//   RELEASE_KEY_PASSWORD=...
+// 未配置时 assembleRelease 产出未签名 APK（无法直接安装，仅用于验证构建）。
+val releaseKeystoreFile = providers.gradleProperty("RELEASE_KEYSTORE_FILE").orNull
+val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").orNull
+
 android {
     namespace = "com.sjtu.runner"
     compileSdk = 34
@@ -29,12 +40,34 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    signingConfigs {
+        if (releaseKeystoreFile != null) {
+            create("release") {
+                storeFile = file(releaseKeystoreFile)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (signingConfigs.names.contains("release")) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
 }
 
 dependencies {
-    // Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2024.01.00")
+    // Compose BOM（统一版本，避免 material3 与 animation-core 版本错配）
+    val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
+    androidTestImplementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
@@ -57,8 +90,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     testImplementation(libs.junit)
+
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("io.coil-kt:coil-gif:2.5.0")

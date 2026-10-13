@@ -99,7 +99,7 @@ fun StatusCard(
 
         if (progress.total > 0) {
             LinearProgressIndicator(
-                progress = progress.fraction,
+                progress = { progress.fraction },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),

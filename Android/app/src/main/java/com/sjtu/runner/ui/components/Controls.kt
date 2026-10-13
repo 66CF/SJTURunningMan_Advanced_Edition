@@ -17,7 +17,9 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -60,6 +62,8 @@ fun ChoiceChips(
                 label = { Text(option) },
                 shape = SectionShape,
                 border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = option == selected,
                     borderColor = MaterialTheme.colorScheme.outlineVariant,
                     selectedBorderColor = MaterialTheme.colorScheme.primary
                 )
@@ -207,7 +211,7 @@ fun MenuDropdown(
             label = label?.let { { Text(it) } },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-                .menuAnchor()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                 .then(modifier),
             shape = SectionShape,
             colors = OutlinedTextFieldDefaults.colors(
@@ -241,7 +245,7 @@ fun MenuDropdown(
                 )
             }
             if (trailingContent != null) {
-                androidx.compose.material3.Divider()
+                HorizontalDivider()
                 trailingContent()
             }
         }
