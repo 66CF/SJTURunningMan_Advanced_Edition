@@ -81,7 +81,7 @@ sudo dpkg -i SJTURunningMan_<版本>_linux.deb
 - 摘要显示距离、点数、时长、最长单段、跳段数量与上传状态；
 - 单段大于 150 m 的跳段会红色高亮，用于发现路线文件或生成结果的异常。
 
-![路线预览](./images/desktop-preview.png)
+![路线预览](./images/desktop-preview.webp)
 
 > 预览用系统浏览器打开而不是内嵌 Qt WebEngine，是为了避免 Windows exe 体积显著增大。
 

@@ -2,7 +2,7 @@
 
 Version **`4.5.0`** (`versionName` in `apps/android/app/build.gradle.kts`, `versionCode = 40500`). Project path: `apps/android/`.
 
-![Android main screen](../images/android-main.png)
+![Android main screen](../images/android-main.webp)
 
 ## Contents
 
@@ -53,7 +53,7 @@ The log panel prints generation and upload progress per record, with a few secon
 2. More points give a better fit. **Order matters, and the start should be close to the finish.**
 3. Save, return to the main screen and run again.
 
-![Route design](../images/android-route.png)
+![Route design](../images/android-route.webp)
 
 Coordinate format and system differences: [routes.md](./routes.md).
 

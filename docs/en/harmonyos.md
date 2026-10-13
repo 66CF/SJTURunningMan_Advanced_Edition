@@ -4,7 +4,7 @@ Version **`4.2.0`**, bundle name `com.sjtu.runner` (`apps/harmonyos/AppScope/app
 
 > **Anything not stated here matches the Android build** — parameter ranges, upload flow and logging are aligned. Only the install procedure and login entry point differ. The project was migrated from the Android native project (see `apps/harmonyos/oh-package.json5`).
 
-![HarmonyOS main screen](../images/harmonyos-main.png)
+![HarmonyOS main screen](../images/harmonyos-main.webp)
 
 ## Contents
 
