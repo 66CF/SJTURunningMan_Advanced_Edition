@@ -4,7 +4,7 @@
 
 iOS 版**没有预编译安装包**，需要用 Xcode 自行编译并签名后安装到 iPhone。
 
-![iOS 主界面](./images/ios-main.png)
+![iOS 主界面](./images/ios-main.webp)
 
 ## 目录
 

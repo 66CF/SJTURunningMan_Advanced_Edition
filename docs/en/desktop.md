@@ -81,7 +81,7 @@ Desktop-only: **preview before you upload**.
 - The summary shows distance, point count, duration, longest segment, jump-segment count and upload status.
 - Segments longer than 150 m are highlighted in red to expose bad route files or generation results.
 
-![Route preview](../images/desktop-preview.png)
+![Route preview](../images/desktop-preview.webp)
 
 > The preview opens in the system browser instead of embedding Qt WebEngine, to keep the Windows executable small.
 

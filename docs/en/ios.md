@@ -4,7 +4,7 @@ Version **`4.5.0`** (`MARKETING_VERSION`, kept in sync with `versionName` in `ap
 
 There is **no prebuilt package** for iOS — you build and sign it yourself with Xcode.
 
-![iOS main screen](../images/ios-main.png)
+![iOS main screen](../images/ios-main.webp)
 
 ## Contents
 

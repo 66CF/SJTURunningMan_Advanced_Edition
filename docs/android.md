@@ -2,7 +2,7 @@
 
 版本 **`4.5.0`**（`apps/android/app/build.gradle.kts` 的 `versionName`，`versionCode = 40500`）。工程路径 `apps/android/`。
 
-![安卓主界面](./images/android-main.png)
+![安卓主界面](./images/android-main.webp)
 
 ## 目录
 
@@ -53,7 +53,7 @@
 2. 点越多越贴合，**注意点是有顺序的，且起始点与终止点越接近越好**；
 3. 保存后回到主界面重新开跑。
 
-![路线设计](./images/android-route.png)
+![路线设计](./images/android-route.webp)
 
 具体的坐标格式、坐标系差异，见 [routes.md](./routes.md)。
 

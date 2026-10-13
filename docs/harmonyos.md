@@ -4,7 +4,7 @@
 
 > **未特别说明的内容与安卓端一致** —— 参数范围、上传流程、日志行为都对齐安卓版；差异仅在安装方式与登录入口。工程由 Android 原生工程迁移而来（见 `apps/harmonyos/oh-package.json5`）。
 
-![鸿蒙主界面](./images/harmonyos-main.png)
+![鸿蒙主界面](./images/harmonyos-main.webp)
 
 ## 目录
 

@@ -64,7 +64,7 @@ A route with no red segments and close endpoints is a valid built-in candidate.
 1. Open the route design page and tap points **in order**.
 2. More points fit better. **Order matters, and start/finish should be close.**
 
-![Android route design](../images/android-route.png)
+![Android route design](../images/android-route.webp)
 
 ## Deleting an imported route
 
