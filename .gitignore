@@ -1,4 +1,6 @@
+# =========================
 # Python
+# =========================
 **/__pycache__/
 *.py[cod]
 *$py.class
@@ -13,41 +15,32 @@ ENV/
 env/
 .env
 .venv
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
 
 # PyInstaller
 *.spec
 !main.spec
 
-# IDE
+# =========================
+# IDE / Editor
+# =========================
 .idea/
+*.iml
 .vscode/
 *.swp
 *.swo
 *~
+*.bak
+*.orig
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Android
-# APK files
-*.apk
-*.aab
-
-# Build outputs
-**/build/
-**/.gradle/
-**/gradle/
-.gradle/
-/local.properties
-/.idea/
-*.iml
-.externalNativeBuild
-/captures
-**/release/
-**/debug/
-
-# Qwen/Agent files
+# Agent / AI tooling
 .qwen/
 .agents/
 .codex/
@@ -55,12 +48,111 @@ Thumbs.db
 .cursor/
 .gemini/
 
+# =========================
+# OS
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# =========================
+# Android (Gradle)
+# =========================
+# Build outputs (never commit)
+.gradle/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+captures/
+Android/.kotlin/
+Android/app/release/
+Android/app/debug/
+Android/app/profile/
+Android/app/benchmark/
+
+# Gradle / local config
+local.properties
+gradle.properties.bak
+
+# Packaging outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.jks
+*.keystore
+!debug.keystore
+
+# NOTE: do NOT ignore gradle wrapper —
+#   Android/gradle/wrapper/gradle-wrapper.jar
+#   Android/gradle/wrapper/gradle-wrapper.properties
+#   Android/gradle/libs.versions.toml
+# must stay tracked.
+
+# =========================
+# iOS / Xcode
+# =========================
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.mobi
+*.xccheckout
+*.xcscmblueprint
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.build/
+Pods/
+.swiftpm/
+.build/
+Package.resolved
+
+# NOTE: keep tracked —
+#   *.xcodeproj/project.pbxproj
+#   *.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+
+# =========================
+# HarmonyOS / ArkTS
+# =========================
+node_modules/
+oh_modules/
+.hvigor/
+.hvigor_debug/
+.clangd
+.clang-format
+.clang-tidy
+.appanalyzer/
+**/.test/
+**/build/default/
+*.har
+*.hap
+*.hsp
+/local.properties
+
+# =========================
 # Project specific
+# =========================
 configs/*
 refs/
 /Routes/
 
+# =========================
 # Other
+# =========================
 *.log
 *.tmp
 *.temp
+*.pid
+*.seed
