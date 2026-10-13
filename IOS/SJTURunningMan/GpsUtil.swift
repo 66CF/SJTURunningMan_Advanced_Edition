@@ -47,7 +47,7 @@ struct GpsUtil {
     }
 }
 
-struct Coord {
+struct Coord: Equatable {
     let lon: Double
     let lat: Double
 }

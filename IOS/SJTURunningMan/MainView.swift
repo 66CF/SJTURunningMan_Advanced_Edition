@@ -2,414 +2,548 @@
 //  MainView.swift
 //  SJTURunningMan
 //
-//  Created by Jie Tang on 2026/5/4.
+//  主界面：状态卡、跑步路线、任务设置、运行日志与底部操作栏。
+//  结构对齐安卓版 ui/MainScreen.kt，卡片与按钮采用 iOS 26/27 Liquid Glass 外观。
 //
-
 
 import SwiftUI
 
-// MARK: - Glass Style
-struct GlassCard: ViewModifier {
-    let material: Material
-
-    func body(content: Content) -> some View {
-        content
-            .padding()
-            .background(material.opacity(0.55))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(.white.opacity(0.2), lineWidth: 0.5)
-            )
-    }
-}
-
-extension View {
-    func glassCard(material: Material = .thinMaterial) -> some View {
-        modifier(GlassCard(material: material))
-    }
-}
-
-struct GlassButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(.thinMaterial)
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.2), .purple.opacity(0.15)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                }
-            )
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(.white.opacity(0.3), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-            .opacity(configuration.isPressed ? 0.8 : 1)
-    }
-}
-
 struct MainView: View {
-    @StateObject private var viewModel = MainViewModel()
-    @State private var showLogin = false
+    @State private var viewModel = MainViewModel()
 
-    // 参数状态
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    // 弹窗与导航
+    @State private var showLogin = false
+    @State private var showRouteDesign = false
+    @State private var showDatePicker = false
+    @State private var showAbout = false
+    @State private var showCommitment = false
+    @State private var routeToDelete: RouteInfo?
+    @State private var snackbarMessage: String?
+
+    // 任务参数
     @State private var days = 1
     @State private var showCustomDays = false
     @State private var customDaysText = ""
+    @State private var hour = AppConfig.defaultRunHour
+    @State private var minute = AppConfig.defaultRunMinute
+    @State private var second = AppConfig.defaultRunSecond
+    @State private var distanceKm = AppConfig.defaultDistanceKm
+    @State private var startDate = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
 
-    @State private var hour = 8
-    @State private var minute = 0
-    @State private var showCustomTime = false
+    @AppStorage("commitment_accepted") private var commitmentAccepted = false
 
-    @State private var startDate = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
-    @State private var showDatePicker = false
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
-    @State private var distanceKm = 5.0
-    @State private var showRouteDesign = false
-    @State private var showDeleteRouteAlert = false
+    private var isCompact: Bool { verticalSizeClass == .compact }
+    private var logHeight: CGFloat { isCompact ? 150 : 210 }
+    private var previewHeight: CGFloat { isCompact ? 120 : 150 }
+
+    private var dateText: String { Self.dateFormatter.string(from: startDate) }
+    private var daysLabel: String { showCustomDays ? "自定义" : "\(days)" }
+
+    private var config: RunConfig {
+        RunConfig(days: days, distanceKm: distanceKm, hour: hour, minute: minute, second: second, startDate: startDate)
+    }
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // 参数卡片
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("任务参数").font(.headline)
-                        Divider().overlay(.white.opacity(0.3))
-
-                        // 路线选择
-                        SettingRow(icon: "point.topleft.down.curvedto.point.bottomright.up", label: "跑步路线") {
-                            HStack(spacing: 4) {
-                                DropdownButton(
-                                    items: viewModel.routes.map { route in
-                                        "\(route.name) (\(route.pointCount)点)"
-                                    } + ["设计新路线"],
-                                    selected: viewModel.selectedRoute.map { "\($0.name) (\($0.pointCount)点)" } ?? "选择路线"
-                                ) { item in
-                                    if item == "设计新路线" {
-                                        showRouteDesign = true
-                                    } else {
-                                        if let route = viewModel.routes.first(where: {
-                                            "\($0.name) (\($0.pointCount)点)" == item
-                                        }) {
-                                            viewModel.selectRoute(route)
-                                        }
-                                    }
-                                }
-
-                                // Delete button for custom routes
-                                if let route = viewModel.selectedRoute, !route.isDefault {
-                                    Button(role: .destructive) {
-                                        showDeleteRouteAlert = true
-                                    } label: {
-                                        Image(systemName: "trash.circle.fill")
-                                            .foregroundColor(.red)
-                                            .font(.title3)
-                                    }
-                                }
-                            }
+        ZStack {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        statusCard
+                        if viewModel.reloginRequired {
+                            reloginBanner
                         }
-                        SettingRow(icon: "calendar", label: "跑步天数") {
-                            if !showCustomDays {
-                                DropdownButton(items: ["1 天", "3 天", "5 天", "7 天", "10 天", "15 天", "30 天", "自定义"],
-                                               selected: "\(days) 天") { item in
-                                    if item == "自定义" { showCustomDays = true }
-                                    else if let d = Int(item.replacingOccurrences(of: " 天", with: "")) {
-                                        days = d
-                                    }
-                                }
-                            } else {
-                                HStack {
-                                    TextField("天数", text: $customDaysText)
-                                        #if os(iOS)
-                                        .keyboardType(.numberPad)
-                                        #endif
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 80)
-                                    Button("确定") {
-                                        if let d = Int(customDaysText), d > 0 { days = d }
-                                        showCustomDays = false
-                                    }
-                                }
-                            }
-                        }
-
-                        // 时间
-                        SettingRow(icon: "clock", label: "开始时间") {
-                            if !showCustomTime {
-                                DropdownButton(items: (6...22).map { String(format: "%02d:00", $0) } + ["自定义"],
-                                               selected: String(format: "%02d:%02d", hour, minute)) { item in
-                                    if item == "自定义" {
-                                        showCustomTime = true
-                                    } else {
-                                        let parts = item.split(separator: ":")
-                                        hour = Int(parts[0]) ?? 8
-                                        minute = Int(parts[1]) ?? 0
-                                    }
-                                }
-                            } else {
-                                HStack {
-                                    TextField("时", value: $hour, formatter: NumberFormatter())
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 50)
-                                    Text(":")
-                                    TextField("分", value: $minute, formatter: NumberFormatter())
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 50)
-                                    Button("确定") { showCustomTime = false }
-                                }
-                            }
-                        }
-
-                        // 日期
-                        SettingRow(icon: "calendar.badge.clock", label: "起始日期") {
-                            Button {
-                                if !viewModel.isRunning { showDatePicker = true }
-                            } label: {
-                                Text(startDate, style: .date)
-                                    .foregroundColor(.primary)
-                            }
-                            .disabled(viewModel.isRunning)
-                        }
-
-                        // 距离滑块
-                        SettingRow(icon: "figure.run", label: "目标距离") {
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text("\(Int(distanceKm)) km").bold()
-                                    .foregroundStyle(
-                                        LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
-                                    )
-                                Slider(value: $distanceKm, in: 1...5, step: 1)
-                                    .tint(.purple)
-                                    .frame(width: 140)
-                            }
-                        }
+                        routeSection
+                        settingsSection
+                        logSection
+                        DisclaimerNotice()
+                        Spacer().frame(height: 8)
                     }
-                    .glassCard()
-
-                    // 重新登录提示
-                    if viewModel.needRelogin {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.red)
-                            Text("检测到cookie过期，请重新登录")
-                                .font(.callout)
-                            Spacer()
-                            Button("重新登录") {
-                                showLogin = true
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                        }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                    }
-
-                    // 按钮组
-                    HStack(spacing: 12) {
-                        Button {
-                            let formatter = DateFormatter()
-                            formatter.dateFormat = "yyyy-MM-dd"
-                            viewModel.startUpload(days: days,
-                                                  distanceKm: Int(distanceKm),
-                                                  hour: hour,
-                                                  minute: minute,
-                                                  dateString: formatter.string(from: startDate))
-                        } label: {
-                            Label("开始任务", systemImage: "play.fill")
-                        }
-                        .buttonStyle(GlassButtonStyle())
-                        .disabled(viewModel.isRunning)
-
-                        Button {
-                            viewModel.stopUpload()
-                        } label: {
-                            Label("停止任务", systemImage: "stop.fill")
-                        }
-                        .buttonStyle(GlassButtonStyle())
-                        .disabled(!viewModel.isRunning)
-                    }
-
-                    // 日志区域
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("运行日志")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        ScrollViewReader { scrollProxy in
-                            ScrollView {
-                                Text(viewModel.logText)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(8)
-                                    .id("logBottom")
-                            }
-                            .frame(height: 300)
-                            .background(.thinMaterial)
-                            .cornerRadius(12)
-                            .onChange(of: viewModel.logText) { _ in
-                                scrollProxy.scrollTo("logBottom", anchor: .bottom)
-                            }
-                        }
-                    }
-                    .glassCard()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
-                .padding()
+                .background(backgroundGradient)
+                .navigationTitle("交我润")
+                .navigationSubtitle("v\(AppConfig.versionName)")
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .toolbar { toolbarContent }
+                .safeAreaInset(edge: .bottom) { bottomBar }
             }
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.08, green: 0.12, blue: 0.28),
-                        Color(red: 0.15, green: 0.06, blue: 0.25),
-                        Color(red: 0.05, green: 0.10, blue: 0.20),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            )
-            .scrollContentBackground(.hidden)
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("SJTURunningMan")
-                        .font(.system(size: 22, weight: .semibold))
-                        .italic()
-                        .foregroundStyle(
-                            LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
-                        )
-                }
+
+            snackbarLayer
+            dialogLayer
+        }
+        .animation(.easeInOut(duration: 0.2), value: showCommitment)
+        .animation(.easeInOut(duration: 0.2), value: showAbout)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.routeConflict)
+        .animation(.easeInOut(duration: 0.2), value: routeToDelete)
+        .task(id: config) { viewModel.updateConfig(config) }
+        .onAppear {
+            if !commitmentAccepted {
+                showCommitment = true
             }
-            #if os(iOS)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            #endif
-            .sheet(isPresented: $showLogin, onDismiss: {
-                viewModel.reloginCompleted()
-            }) {
-                LoginView {
-                    showLogin = false
-                    viewModel.reloginCompleted()
-                }
-            }
-            .sheet(isPresented: $showDatePicker) {
-                DatePickerSheet(date: $startDate, isPresented: $showDatePicker)
-            }
-            .sheet(isPresented: $showRouteDesign, onDismiss: {
-                viewModel.refreshRoutes()
-            }) {
-                RouteDesignView()
-            }
-            .alert("删除路线", isPresented: $showDeleteRouteAlert) {
-                Button("取消", role: .cancel) { }
-                Button("删除", role: .destructive) {
-                    if let route = viewModel.selectedRoute {
-                        viewModel.deleteRoute(route)
-                    }
-                }
-            } message: {
-                Text("确定要删除路线「\(viewModel.selectedRoute?.name ?? "")」吗？此操作不可撤销。")
-            }
-            .onAppear {
-                viewModel.loadRoutes()
-                checkLoginStatus()
-            }
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginView { showLogin = false }
+        }
+        .sheet(isPresented: $showRouteDesign, onDismiss: { viewModel.refreshRoutes() }) {
+            RouteDesignView()
+        }
+        .sheet(isPresented: $showDatePicker) {
+            DatePickerSheet(date: $startDate)
         }
     }
 
-    private func checkLoginStatus() {
-        if let cookies = HTTPCookieStorage.shared.cookies(for: URL(string: "https://jaccount.sjtu.edu.cn")!) {
-            if cookies.contains(where: { $0.name == "JAAuthCookie" }) {
-                // 已登录，什么也不做
-            } else {
+    // MARK: - 背景与工具栏
+
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [AppTheme.gradientStart.opacity(0.55), AppTheme.background],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                showAbout = true
+            } label: {
+                Image(systemName: "info.circle")
+            }
+            .accessibilityLabel("关于与检查更新")
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
                 showLogin = true
+            } label: {
+                Image(systemName: "person.badge.key")
             }
-        } else {
-            showLogin = true
+            .accessibilityLabel("重新登录")
         }
     }
-}
 
-// MARK: - 辅助组件
+    // MARK: - 状态卡
 
-struct SettingRow<Content: View>: View {
-    let icon: String
-    let label: String
-    let content: Content
-
-    init(icon: String, label: String, @ViewBuilder content: () -> Content) {
-        self.icon = icon
-        self.label = label
-        self.content = content()
+    private var statusCard: some View {
+        StatusCard(
+            progress: viewModel.progress,
+            headline: "\(days) 次 · \(String(format: "%.1f", distanceKm)) km",
+            stats: [
+                StatItem("次数", "\(days)"),
+                StatItem("距离", String(format: "%.1f km", distanceKm)),
+                StatItem("时间", String(format: "%02d:%02d:%02d", hour, minute, second))
+            ]
+        )
     }
 
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .frame(width: 24)
-                .foregroundColor(.secondary)
-            Text(label)
-                .frame(width: 72, alignment: .leading)
-            Spacer()
-            content
+    private var reloginBanner: some View {
+        SectionCard(title: "Cookie 已过期", icon: "exclamationmark.triangle", elevated: true) {
+            HStack(spacing: 10) {
+                Text("登录状态失效，请重新登录后继续上传。")
+                    .font(.callout)
+                    .foregroundStyle(AppTheme.onSurface)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    showLogin = true
+                } label: {
+                    Text("登录")
+                }
+                .buttonStyle(.glassProminent)
+            }
         }
     }
-}
 
-struct DropdownButton: View {
-    let items: [String]
-    let selected: String
-    let onSelect: (String) -> Void
+    // MARK: - 跑步路线
 
-    var body: some View {
-        Menu {
-            ForEach(items, id: \.self) { item in
-                Button(action: { onSelect(item) }) {
-                    Text(item)
+    private var routeSection: some View {
+        SectionCard(
+            title: "跑步路线",
+            icon: "point.topleft.down.curvedto.point.bottomright.up",
+            supporting: viewModel.selectedRoute.map { "\($0.pointCount) 个坐标点" } ?? "请选择路线",
+            action: {
+                Button {
+                    showRouteDesign = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("设计新路线")
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                MenuDropdown(
+                    value: viewModel.selectedRoute?.name ?? "请选择路线",
+                    label: "预设路线",
+                    options: viewModel.routes.map { route in
+                        RouteOption(
+                            id: route.id,
+                            title: route.name,
+                            subtitle: "\(route.pointCount) 个点" + (route.isDefault ? " · 内置" : ""),
+                            selected: viewModel.selectedRoute?.id == route.id
+                        )
+                    },
+                    onSelect: { option in
+                        if let route = viewModel.routes.first(where: { $0.id == option.id }) {
+                            viewModel.selectRoute(route)
+                        }
+                    }
+                )
+
+                RoutePreviewCanvas(
+                    samples: viewModel.preview?.samples ?? [],
+                    jumpCount: viewModel.preview?.jumpCount ?? 0
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: previewHeight)
+                .background(AppTheme.cardLow)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.preview?.title ?? "路线预览")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.onSurface)
+                        Text(viewModel.preview?.summary ?? "点击「预览路线」按当前设置离线生成")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.onSurfaceVariant)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    let jumps = viewModel.preview?.jumpCount ?? 0
+                    if jumps > 0 {
+                        StatusPill(text: "\(jumps) 处跳段", color: AppTheme.error)
+                    }
+                }
+
+                SectionDivider()
+
+                HStack(spacing: 8) {
+                    Button {
+                        viewModel.previewRoute()
+                    } label: {
+                        Label("预览路线", systemImage: "map")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(viewModel.running || viewModel.selectedRoute == nil)
+
+                    Button {
+                        routeToDelete = viewModel.selectedRoute
+                    } label: {
+                        Label("删除路线", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(AppTheme.error)
+                    .disabled(viewModel.running || viewModel.selectedRoute == nil || viewModel.selectedRoute?.isDefault == true)
                 }
             }
-        } label: {
-            HStack {
-                Text(selected)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.caption)
+        }
+    }
+
+    // MARK: - 任务设置
+
+    private var settingsSection: some View {
+        SectionCard(title: "任务设置", icon: "calendar") {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("跑步次数")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.onSurface)
+
+                    if showCustomDays {
+                        HStack(spacing: 8) {
+                            NumberField(value: customDaysText, label: "次数 1-30", width: 140, maxLength: 2) { value in
+                                customDaysText = value
+                            }
+                            Button {
+                                if let value = Int(customDaysText) {
+                                    days = min(max(value, 1), AppConfig.maxRunTimes)
+                                }
+                                showCustomDays = false
+                            } label: {
+                                Text("确定")
+                            }
+                            .buttonStyle(.glass)
+                        }
+                    } else {
+                        ChoiceChips(
+                            options: ["1", "3", "5", "7", "10", "15", "30", "自定义"],
+                            selected: daysLabel,
+                            onSelect: { option in
+                                if option == "自定义" {
+                                    showCustomDays = true
+                                } else if let value = Int(option) {
+                                    days = value
+                                }
+                            }
+                        )
+                    }
+                }
+
+                SectionDivider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("开始时间")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.onSurface)
+                    TimeField(hour: hour, minute: minute, second: second) { h, m, s in
+                        hour = h
+                        minute = m
+                        second = s
+                    }
+                    Text("每次跑步自动加入 ±10 分钟 / ±30 秒随机波动")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.onSurfaceVariant)
+                }
+
+                SectionDivider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("结束日期")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.onSurface)
+
+                    Button {
+                        if !viewModel.running {
+                            showDatePicker = true
+                        }
+                    } label: {
+                        HStack {
+                            Text(dateText)
+                                .font(.body)
+                                .foregroundStyle(AppTheme.onSurface)
+                            Spacer(minLength: 0)
+                            Image(systemName: "calendar")
+                                .foregroundStyle(AppTheme.primary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .background(AppTheme.cardLow, in: RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius)
+                                .stroke(AppTheme.outlineVariant, lineWidth: 1)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.running)
+                }
+
+                SectionDivider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "ruler")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(AppTheme.primary)
+                        Text("目标距离")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.onSurface)
+                    }
+                    DistanceSlider(
+                        distanceKm: distanceKm,
+                        range: AppConfig.minDistanceKm...AppConfig.maxDistanceKm
+                    ) { value in
+                        distanceKm = value
+                    }
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.thinMaterial)
-            .cornerRadius(8)
+        }
+    }
+
+    // MARK: - 运行日志
+
+    private var logSection: some View {
+        SectionCard(
+            title: "运行日志",
+            icon: "terminal",
+            supporting: viewModel.running ? "任务运行中" : "共 \(viewModel.logs.count) 条记录",
+            action: {
+                if !viewModel.running && !viewModel.logs.isEmpty {
+                    Button {
+                        viewModel.clearLogs()
+                    } label: {
+                        Text("清空")
+                    }
+                    .buttonStyle(.glass)
+                }
+            }
+        ) {
+            ConsoleLog(entries: viewModel.logs)
+                .frame(maxWidth: .infinity)
+                .frame(height: logHeight)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+        }
+    }
+
+    // MARK: - 底部操作栏
+
+    private var bottomBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                viewModel.previewRoute()
+            } label: {
+                Label("预览", systemImage: "map")
+                    .frame(maxWidth: .infinity, minHeight: 50)
+            }
+            .buttonStyle(.glass)
+            .disabled(viewModel.running)
+
+            if viewModel.running {
+                Button(role: .destructive) {
+                    viewModel.stopUpload()
+                } label: {
+                    Label("停止任务", systemImage: "stop.fill")
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(AppTheme.error)
+            } else {
+                Button {
+                    startTask()
+                } label: {
+                    Label("开始任务", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(viewModel.selectedRoute == nil)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - 提示条
+
+    @ViewBuilder
+    private var snackbarLayer: some View {
+        if let snackbarMessage {
+            VStack {
+                Spacer()
+                Text(snackbarMessage)
+                    .font(.callout)
+                    .foregroundStyle(AppTheme.onSurface)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .glassEffect(.regular, in: Capsule())
+                    .padding(.bottom, 96)
+            }
+            .transition(.opacity)
+            .task(id: snackbarMessage) {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                withAnimation { self.snackbarMessage = nil }
+            }
+        }
+    }
+
+    // MARK: - 弹窗
+
+    @ViewBuilder
+    private var dialogLayer: some View {
+        if showCommitment {
+            CommitmentDialog(
+                onAccept: {
+                    commitmentAccepted = true
+                    showCommitment = false
+                },
+                onDecline: {
+                    // 对齐安卓：拒绝承诺书则退出程序
+                    exit(0)
+                }
+            )
+            .zIndex(1)
+        }
+
+        if let conflict = viewModel.routeConflict {
+            RouteConflictDialog(conflict: conflict) { decision in
+                viewModel.resolveRouteConflict(decision)
+            }
+            .zIndex(2)
+        }
+
+        if showAbout {
+            AboutDialog { showAbout = false }
+                .zIndex(3)
+        }
+
+        if let route = routeToDelete {
+            deleteRouteDialog(route)
+                .zIndex(4)
+        }
+    }
+
+    private func deleteRouteDialog(_ route: RouteInfo) -> some View {
+        DialogScrim(onTapOutside: { routeToDelete = nil }) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("删除路线")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.onSurface)
+                Text("确定要删除路线「\(route.name)」吗？该操作不可撤销。")
+                    .font(.callout)
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Button {
+                        routeToDelete = nil
+                    } label: {
+                        Text("取消").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+
+                    Button {
+                        viewModel.deleteRoute(route)
+                        routeToDelete = nil
+                    } label: {
+                        Text("删除").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(AppTheme.error)
+                }
+            }
+        }
+    }
+
+    // MARK: - 行为
+
+    private func startTask() {
+        if let error = viewModel.validate(config) {
+            withAnimation { snackbarMessage = error }
+        } else {
+            viewModel.startUpload(config)
         }
     }
 }
+
+// MARK: - 日期选择
 
 struct DatePickerSheet: View {
     @Binding var date: Date
-    @Binding var isPresented: Bool
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             DatePicker("选择日期", selection: $date, displayedComponents: .date)
                 .datePickerStyle(.graphical)
                 .padding()
-                .navigationTitle("起始日期")
+                .navigationTitle("结束日期")
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("确定") { isPresented = false }
+                        Button("确定") { dismiss() }
                     }
                 }
         }
