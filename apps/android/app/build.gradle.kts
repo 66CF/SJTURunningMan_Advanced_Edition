@@ -32,10 +32,6 @@ android {
         compose = true
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -63,6 +59,13 @@ android {
     }
 }
 
+// Kotlin 2.4 起 kotlinOptions 已不可用，改用 compilerOptions DSL
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     // Compose BOM（统一版本，避免 material3 与 animation-core 版本错配）
     val composeBom = platform(libs.androidx.compose.bom)
@@ -84,10 +87,10 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp-urlconnection:4.12.0")
 
     // Gson
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.14.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
