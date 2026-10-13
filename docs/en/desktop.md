@@ -1,6 +1,6 @@
 # Desktop Guide
 
-For the Windows / macOS / Linux desktop build, currently **`v4.4.0`** (version comes from `global_version` in `src/config.py`).
+For the Windows / macOS / Linux desktop build, currently **`v4.5.0`** (version comes from `global_version` in `src/config.py`).
 
 ![Desktop main window](../images/desktop-main.webp)
 

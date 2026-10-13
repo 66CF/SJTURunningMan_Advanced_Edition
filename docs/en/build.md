@@ -46,7 +46,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 - Entry point `qtui.py`; the whole `assets/` directory is bundled.
 - Icon is `assets/SJTURM.ico` on Windows, `assets/SJTURM.icns` on macOS.
 - The macOS artifact is `universal2` (Intel + Apple Silicon).
-- Version comes from the `APP_VERSION` environment variable, defaulting to `4.4.0` locally.
+- Version comes from the `APP_VERSION` environment variable, defaulting to `4.5.0` locally.
 
 > ⚠️ Do not run `pyinstaller qtui.py` directly — you lose the icon and bundled assets.
 

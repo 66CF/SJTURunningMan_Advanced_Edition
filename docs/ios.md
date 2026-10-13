@@ -1,6 +1,6 @@
 # iOS 版使用指南
 
-版本 **`1.0`**，Bundle ID `SJTU.SJTURunningMan`。工程路径 `apps/ios/`。
+版本 **`4.5.0`**（`MARKETING_VERSION`，与 `apps/ios/SJTURunningMan/AppConfig.swift` 的 `versionName` 一致），Bundle ID `SJTU.SJTURunningMan`。工程路径 `apps/ios/`。
 
 iOS 版**没有预编译安装包**，需要用 Xcode 自行编译并签名后安装到 iPhone。
 

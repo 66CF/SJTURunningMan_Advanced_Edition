@@ -1,6 +1,6 @@
 # iOS 版
 
-这是 SJTU 一键校园跑工具的 iOS 工程（Swift / SwiftUI），版本 `1.0`，Bundle ID `SJTU.SJTURunningMan`。
+这是 SJTU 一键校园跑工具的 iOS 工程（Swift / SwiftUI），版本 `4.5.0`，Bundle ID `SJTU.SJTURunningMan`。
 
 **完整的使用、签名与编译说明请见 [../../docs/ios.md](../../docs/ios.md)** —— 本文件只作为目录内指引。
 
@@ -26,7 +26,7 @@ apps/ios/
 
 # iOS (English)
 
-The iOS app of SJTU RunningMan (Swift / SwiftUI), version `1.0`, bundle ID `SJTU.SJTURunningMan`.
+The iOS app of SJTU RunningMan (Swift / SwiftUI), version `4.5.0`, bundle ID `SJTU.SJTURunningMan`.
 
 **See [../../docs/en/ios.md](../../docs/en/ios.md) for the full guide** — this file is just a pointer.
 

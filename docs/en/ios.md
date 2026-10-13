@@ -1,6 +1,6 @@
 # iOS Guide
 
-Version **`1.0`**, bundle ID `SJTU.SJTURunningMan`. Project path: `apps/ios/`.
+Version **`4.5.0`** (`MARKETING_VERSION`, kept in sync with `versionName` in `apps/ios/SJTURunningMan/AppConfig.swift`), bundle ID `SJTU.SJTURunningMan`. Project path: `apps/ios/`.
 
 There is **no prebuilt package** for iOS — you build and sign it yourself with Xcode.
 

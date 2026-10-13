@@ -46,7 +46,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 - 入口 `qtui.py`，`assets/` 整目录打进程序；
 - 图标 Windows 用 `assets/SJTURM.ico`，macOS 用 `assets/SJTURM.icns`；
 - macOS 产物是 `universal2` 架构（Intel + Apple Silicon 通用）；
-- 版本号从环境变量 `APP_VERSION` 注入，本地缺省 `4.4.0`。
+- 版本号从环境变量 `APP_VERSION` 注入，本地缺省 `4.5.0`。
 
 > ⚠️ 不要直接 `pyinstaller qtui.py` —— 那会丢失图标与 `assets/` 资源。
 

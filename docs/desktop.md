@@ -1,6 +1,6 @@
 # 电脑版使用指南
 
-适用于 Windows / macOS / Linux 桌面版，当前版本 **`v4.4.0`**（版本号来自 `src/config.py` 的 `global_version`）。
+适用于 Windows / macOS / Linux 桌面版，当前版本 **`v4.5.0`**（版本号来自 `src/config.py` 的 `global_version`）。
 
 ![电脑版主界面](./images/desktop-main.webp)
 

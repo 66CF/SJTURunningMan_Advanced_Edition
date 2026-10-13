@@ -8,9 +8,9 @@ This directory is the English mirror of the project documentation. The root [REA
 
 | Platform | Version | Document | When to use |
 | --- | --- | --- | --- |
-| Desktop (Windows / macOS / Linux) | `v4.4.0` | [desktop.md](./desktop.md) | Full-featured GUI with route preview |
+| Desktop (Windows / macOS / Linux) | `v4.5.0` | [desktop.md](./desktop.md) | Full-featured GUI with route preview |
 | Android | `4.5.0` | [android.md](./android.md) | Install the APK and go |
-| iOS | `1.0` | [ios.md](./ios.md) | iPhone; requires building with Xcode |
+| iOS | `4.5.0` | [ios.md](./ios.md) | iPhone; requires building with Xcode |
 | HarmonyOS NEXT | `4.2.0` | [harmonyos.md](./harmonyos.md) | Huawei devices; HAP sideload |
 
 ## General topics
