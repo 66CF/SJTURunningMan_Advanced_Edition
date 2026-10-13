@@ -19,7 +19,16 @@
   </p>
 </div>
 
-[![Star History Chart](https://app.repohistory.com/api/svg?repo=JackyTJie/SJTURunningMan_Advanced_Edition&type=Date&background=0D1117&color=62C3F8)](https://app.repohistory.com/star-history)
+<a href="https://app.repohistory.com/star-history">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"
+      srcset="https://app.repohistory.com/api/svg?repo=JackyTJie/SJTURunningMan_Advanced_Edition&type=Date&background=0D1117&color=62C3F8" />
+    <source media="(prefers-color-scheme: light)"
+      srcset="https://app.repohistory.com/api/svg?repo=JackyTJie/SJTURunningMan_Advanced_Edition&type=Date&background=FFFFFF&color=1F6FEB" />
+    <img alt="Star History Chart"
+      src="https://app.repohistory.com/api/svg?repo=JackyTJie/SJTURunningMan_Advanced_Edition&type=Date&background=0D1117&color=62C3F8" />
+  </picture>
+</a>
 
 ## 简介
 
