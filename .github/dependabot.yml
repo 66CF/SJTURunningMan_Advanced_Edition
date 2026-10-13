@@ -1,0 +1,34 @@
+version: 2
+updates:
+  # 桌面版 Python 依赖（requirements.txt）
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # 发布流水线里的 GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(ci)"
+
+  # 安卓 Gradle 依赖（版本目录在 gradle/libs.versions.toml）
+  - package-ecosystem: "gradle"
+    directory: "/apps/android"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(android)"
+
+# 说明：鸿蒙使用 oh-package.json5 + ohpm，不属于 Dependabot 支持的生态，
+#      依赖升级需手动在 DevEco Studio 中检查。
+#      iOS 依赖由 Xcode 管理，同样不在 Dependabot 覆盖范围内。

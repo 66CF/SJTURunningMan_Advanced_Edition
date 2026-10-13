@@ -7,8 +7,8 @@ from pathlib import Path
 project_root = Path(SPECPATH).resolve()
 assets_dir = project_root / 'assets'
 is_mac = sys.platform == 'darwin'
-# CI 从 release tag 注入；本地缺省沿用 4.4.0
-app_version = os.environ.get('APP_VERSION', '4.4.0')
+# CI 从 release tag 注入；本地缺省沿用 4.5.0
+app_version = os.environ.get('APP_VERSION', '4.5.0')
 icon_path = assets_dir / ('SJTURM.icns' if is_mac else 'SJTURM.ico')
 
 a = Analysis(

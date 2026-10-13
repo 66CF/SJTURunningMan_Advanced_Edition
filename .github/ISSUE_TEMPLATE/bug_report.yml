@@ -1,0 +1,85 @@
+name: 🐞 Bug 报告
+description: 报告一个可以复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！提交前请先确认：
+
+        - 已在 [常见问题](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/blob/master/docs/faq.md) 中搜索过；
+        - 已搜索过 [现有 Issue](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/issues)；
+        - **这是普通 Bug，不是安全漏洞** —— 安全问题请走 [SECURITY.md](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/blob/master/SECURITY.md) 的私有通道。
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      description: 你在哪个平台上遇到问题？
+      options:
+        - 电脑版 Windows
+        - 电脑版 macOS
+        - 电脑版 Linux
+        - 安卓
+        - iOS
+        - 鸿蒙 NEXT
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      description: 界面「说明」里显示的版本，或下载的 Release 标签（例如 v4.4.0 / 4.5.0）
+      placeholder: "4.4.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么？你期望发生什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 尽量给出最小可复现的步骤
+      placeholder: |
+        1. 打开应用
+        2. 设置跑步次数为 2，距离 4km
+        3. 点击「开始生成并上传」
+        4. 第 2 条卡在「上传中」
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 报错
+      description: |
+        粘贴应用日志或报错信息。**必须脱敏** —— 删除 Cookie、密码、验证码、真实姓名学号。
+        贴之前请再读一遍，确认没有凭据。
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 界面问题时请附截图。**同样需要脱敏**：先登出或打码，不要出现账号信息。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 我已确认日志与截图中不含任何凭据（Cookie / 密码 / 验证码 / 真实姓名学号）
+          required: true
