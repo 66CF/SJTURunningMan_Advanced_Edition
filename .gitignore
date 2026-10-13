@@ -71,11 +71,11 @@ desktop.ini
 **/.cxx/
 **/.externalNativeBuild/
 captures/
-Android/.kotlin/
-Android/app/release/
-Android/app/debug/
-Android/app/profile/
-Android/app/benchmark/
+apps/android/.kotlin/
+apps/android/app/release/
+apps/android/app/debug/
+apps/android/app/profile/
+apps/android/app/benchmark/
 
 # Gradle / local config
 local.properties
@@ -92,9 +92,9 @@ gradle.properties.bak
 !debug.keystore
 
 # NOTE: do NOT ignore gradle wrapper —
-#   Android/gradle/wrapper/gradle-wrapper.jar
-#   Android/gradle/wrapper/gradle-wrapper.properties
-#   Android/gradle/libs.versions.toml
+#   apps/android/gradle/wrapper/gradle-wrapper.jar
+#   apps/android/gradle/wrapper/gradle-wrapper.properties
+#   apps/android/gradle/libs.versions.toml
 # must stay tracked.
 
 # =========================
