@@ -12,7 +12,7 @@
 | macOS 安装与首次打开 | `v4.5.0` | [macos.md](./macos.md) | DMG 安装、Gatekeeper 拦截的处理 |
 | 安卓 | `4.5.0` | [android.md](./android.md) | 手机一键跑步，安装 APK 即用 |
 | iOS | `4.5.0` | [ios.md](./ios.md) | iPhone，需自行用 Xcode 编译安装 |
-| 鸿蒙 NEXT | `4.2.0` | [harmonyos.md](./harmonyos.md) | 华为鸿蒙设备，需 HAP 调试安装 |
+| 鸿蒙 NEXT | `4.5.0` | [harmonyos.md](./harmonyos.md) | 华为鸿蒙设备，需 HAP 调试安装 |
 
 ## 通用主题
 
