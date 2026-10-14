@@ -2,7 +2,9 @@
 
 版本 **`4.2.0`**，Bundle Name `com.sjtu.runner`（`apps/harmonyos/AppScope/app.json5`）。工程路径 `apps/harmonyos/`。
 
-> **未特别说明的内容与安卓端一致** —— 参数范围、上传流程、日志行为都对齐安卓版；差异仅在安装方式与登录入口。工程由 Android 原生工程迁移而来（见 `apps/harmonyos/oh-package.json5`）。
+> **未特别说明的内容与安卓端一致** —— 参数范围、上传流程、日志行为都对齐安卓版；差异仅在安装方式与登录入口。
+
+鸿蒙版由 [@AetherWish](https://github.com/AetherWish) 贡献，工程由 Android 原生工程迁移而来（见 `apps/harmonyos/oh-package.json5`）。
 
 ![鸿蒙主界面](./images/harmonyos-main.webp)
 
