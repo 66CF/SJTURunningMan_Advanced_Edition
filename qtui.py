@@ -341,6 +341,7 @@ class SportsUploaderUI(QWidget):
 
         self.rebuild_log_output()
         self.sync_theme_switch()
+        self.update_github_icon()
         self.update()
 
     def set_theme_mode(self, mode):
@@ -409,6 +410,17 @@ class SportsUploaderUI(QWidget):
         label.setObjectName("sectionHint")
         label.setWordWrap(True)
         return label
+
+    def update_github_icon(self):
+        """亮色模式用黑色图标，暗色模式用白色图标，避免按钮底色与图标撞色。"""
+        button = getattr(self, "github_button", None)
+        if button is None:
+            return
+        name = "github-mark-black.svg" if theme.resolve_mode(self._theme_mode) == theme.MODE_LIGHT \
+            else "github-mark.svg"
+        icon_path = os.path.join(RESOURCES_FULL_PATH, name)
+        if os.path.exists(icon_path):
+            button.setIcon(QIcon(icon_path))
 
     def open_github_repo(self):
         QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL))
@@ -711,9 +723,7 @@ class SportsUploaderUI(QWidget):
 
         self.github_button = GlowButton("GitHub", glow_kind="info")
         self.github_button.setObjectName("githubButton")
-        github_icon_path = os.path.join(RESOURCES_FULL_PATH, "github-mark.svg")
-        if os.path.exists(github_icon_path):
-            self.github_button.setIcon(QIcon(github_icon_path))
+        self.update_github_icon()
         self.github_button.setToolTip("打开项目 GitHub 仓库")
         self.github_button.clicked.connect(self.open_github_repo)
         header_layout.addWidget(self.github_button)
