@@ -18,7 +18,7 @@ The HarmonyOS build was contributed by [@AetherWish](https://github.com/AetherWi
 
 > ⚠️ **Complete Huawei developer verification first** to extend the debug certificate validity. Without it the debug certificate expires quickly and you must reinstall.
 
-1. Download the HAP from [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases).
+1. **Build the HAP yourself first** — this project **does not ship a prebuilt HarmonyOS package** in Releases. Build and sign it with DevEco Studio, see [build.md](./build.md#harmonyos).
 2. On the phone: **Settings → About → tap "Software version" 7 times**, restart, and developer options are enabled.
 3. Go to **Settings → System → Developer options → Wireless debugging**, enable it and note the IP and port.
 4. Connect the PC and phone to the same network, download [小白调试助手](https://github.com/likuai2010/auto-installer) and run it, following its on-screen instructions.
@@ -33,6 +33,7 @@ Open the **Account** tab and tap **JAccount 账号** to reach the login page.
 
 | Item | Android | HarmonyOS |
 | --- | --- | --- |
+| How to get it | Download the APK from Releases | **No prebuilt package** — build and sign it yourself with DevEco Studio |
 | Install | APK | HAP + debug certificate (limited validity) |
 | One-tap login | Yes | No, JAccount web login only |
 | Parameters | 1–30 runs / 1–5 km | Same as Android |

@@ -465,6 +465,8 @@ jobs:
           # 兜底值。不能直接找 `versionName = "x"` —— 那里现在写的是变量名。
           android_ver = read("apps/android/app/build.gradle.kts",
                              r'APP_VERSION_NAME"\)\.orNull\s*\?:\s*"([^"]+)"')
+          ios_ver = read("apps/ios/SJTURunningMan.xcodeproj/project.pbxproj",
+                         r"MARKETING_VERSION\s*=\s*([0-9][0-9.]*)\s*;")
           harmony_ver = read("apps/harmonyos/AppScope/app.json5",  r'"versionName"\s*:\s*"([^"]+)"')
           release_date = pathlib.Path("RELEASE_DATE.txt").read_text().strip()
 
@@ -512,7 +514,13 @@ jobs:
               "**适用平台**：",
               f"- Windows / macOS / Linux 图形界面：`v{version}`",
               f"- Android：`{android_ver}`",
-              f"- HarmonyOS NEXT：`{harmony_ver}`（版本号独立）",
+              f"- iOS：`{ios_ver}`",
+              f"- HarmonyOS NEXT：`{harmony_ver}`",
+              "",
+              "> iOS 与 HarmonyOS NEXT 的版本号独立于本次发布，且**不提供预编译包**，"
+              "需自行编译。见 "
+              f"[docs/ios.md](https://github.com/{repo}/blob/master/docs/ios.md) 与 "
+              f"[docs/harmonyos.md](https://github.com/{repo}/blob/master/docs/harmonyos.md)。",
               "",
               "<details>",
               "<summary>What's Changed</summary>",

@@ -65,6 +65,11 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 
 Python 版本固定 3.14.6。两个 deb 都构建在 Ubuntu 24.04 上 —— PySide6 的 aarch64 wheel 是 `manylinux_2_39`，要求 glibc ≥ 2.39，22.04 装不上。
 
+> **iOS 与鸿蒙 NEXT 不在这个流水线里**，Releases 也不提供它们的预编译包，目前都只手工构建：
+>
+> - **iOS** —— 技术上可以用 macos runner 自动化，但需要 Apple 签名身份（证书 + 描述文件）；没有签名的包装不上，所以现阶段不做。
+> - **鸿蒙 NEXT** —— 华为的命令行工具包必须登录华为账号下载且链接短期有效，不适合无人值守的 CI；签名还需要 AppGallery Connect 签发的 keystore / 证书 / profile 三件套。
+
 **正确的发布顺序**：推 tag → 工作流构建 → 生成草稿并挂上全部产物 → 人工审核 → 点发布。不要反过来先手动建 release 再推 tag，`action-gh-release` 会去更新已存在的 release，而 `draft: true` 会把已发布的打回草稿。
 
 #### 产物校验

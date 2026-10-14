@@ -65,6 +65,11 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 
 Python is pinned to 3.14.6. Both debs are built on Ubuntu 24.04 — PySide6's aarch64 wheel is `manylinux_2_39`, requiring glibc ≥ 2.39, which 22.04 does not provide.
 
+> **iOS and HarmonyOS NEXT are not part of this pipeline**, and Releases ships no prebuilt packages for them — both are built by hand today:
+>
+> - **iOS** — technically automatable on a macOS runner, but requires an Apple signing identity (certificate + provisioning profile); an unsigned build cannot be installed, so it is not done for now.
+> - **HarmonyOS NEXT** — Huawei's command-line tools must be downloaded behind a Huawei account and the links are short-lived, which rules out unattended CI; signing additionally needs the keystore / certificate / profile triplet issued through AppGallery Connect.
+
 **Correct order**: push tag → workflow builds → draft release created with all artifacts → human review → publish. Do not create the release manually first and then push the tag: `action-gh-release` would update the existing release, and `draft: true` would flip a published one back to draft.
 
 #### Verifying artifacts
