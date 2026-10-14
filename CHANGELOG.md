@@ -77,7 +77,7 @@
 
 ### v3.0.0 — 2025-11-10
 
-该版本未附发布说明，变更见 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases/tag/3.0.0)。
+该版本未附发布说明，变更见 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases/tag/v3.0.0)。
 
 ---
 
