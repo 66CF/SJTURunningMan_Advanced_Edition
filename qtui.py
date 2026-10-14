@@ -311,7 +311,7 @@ class SportsUploaderUI(QWidget):
         self.apply_theme()
         self.watch_system_color_scheme()
 
-        self.setGeometry(140, 60, 1180, 780)
+        self.setGeometry(140, 60, 1250, 860)
         self.setMinimumSize(980, 680)
 
         # 根据当前窗口宽度调整内容区域宽度
