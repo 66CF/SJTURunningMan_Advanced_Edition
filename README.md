@@ -65,7 +65,11 @@
 
 ## 下载
 
-到 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases) 获取各平台产物。iOS 无预编译包，需自行编译（见 [docs/ios.md](docs/ios.md)）。
+到 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases) 获取各平台产物：
+
+- **Windows / macOS / Linux / 安卓** —— 提供预编译包，下载即用；
+- **iOS** —— 不提供预编译包，需自行用 Xcode 编译，见 [docs/ios.md](docs/ios.md)；
+- **鸿蒙 NEXT** —— 不提供预编译包，需自行用 DevEco Studio 编译并签名，见 [docs/harmonyos.md](docs/harmonyos.md)。
 
 ## 文档导航
 
