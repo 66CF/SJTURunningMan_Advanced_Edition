@@ -52,7 +52,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 
 ### Automated release
 
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml) runs on `v*` tags or manual `workflow_dispatch` and builds five artifacts in parallel into a draft Release:
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) runs on tag pushes (both `4.5.0` and `v4.5.0` work) or manual `workflow_dispatch`, building five artifacts plus a checksum file in parallel into a draft Release:
 
 | Artifact | Runner |
 | --- | --- |
@@ -61,8 +61,28 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 | `SJTURunningMan_<ver>_linux_amd64.deb` | ubuntu-24.04 |
 | `SJTURunningMan_<ver>_linux_arm64.deb` | ubuntu-24.04-arm |
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest (self-signed) |
+| `SHA256SUMS.txt` | generated in the release job |
 
 Python is pinned to 3.14.6. Both debs are built on Ubuntu 24.04 — PySide6's aarch64 wheel is `manylinux_2_39`, requiring glibc ≥ 2.39, which 22.04 does not provide.
+
+**Correct order**: push tag → workflow builds → draft release created with all artifacts → human review → publish. Do not create the release manually first and then push the tag: `action-gh-release` would update the existing release, and `draft: true` would flip a published one back to draft.
+
+#### Verifying artifacts
+
+Every build job generates a **provenance attestation** via `actions/attest-build-provenance`. The certificate is issued by GitHub OIDC and bound to this workflow run and commit, so it **cannot be forged locally**. Users can verify with:
+
+```bash
+# requires gh CLI 2.49+
+gh attestation verify SJTURunningMan_<ver>_windows.exe --repo JackyTJie/SJTURunningMan_Advanced_Edition
+```
+
+Note this proves **build provenance**, not trustworthiness — anyone able to trigger the workflow can also produce a valid attestation. The Android APK additionally carries a self-signature, which is a separate guarantee.
+
+#### Permissions
+
+The workflow default is `contents: read`; write access is elevated per job. The `release` job needs `contents: write`; the five build jobs each need `id-token: write` (to mint the OIDC token) and `attestations: write` (to store the attestation). This keeps the sensitive OIDC permission off jobs like `meta` that don't need it.
+
+The release body is generated dynamically in the `release` job and contains a table of download links and SHA256 digests per platform; GitHub's generated commit list is appended after it.
 
 ### Secrets required before releasing
 
