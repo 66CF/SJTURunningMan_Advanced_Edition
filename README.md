@@ -36,7 +36,11 @@
 
 电脑版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。程序默认以昨日作为结束日期，向前生成指定次数的跑步记录（默认 1 次），每次跑步 4 km，时间为 `08:00:00`。
 
-<img src="assets/Sample.png" alt="Windows 主界面预览" style="zoom: 33%;" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/Sample_Dark.webp" />
+  <source media="(prefers-color-scheme: light)" srcset="assets/Sample_Bright.webp" />
+  <img alt="Windows 主界面预览" src="assets/Sample_Bright.webp" />
+</picture>
 
 ## 平台与文档
 
