@@ -52,7 +52,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 
 ### Automated release
 
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml) runs on `v*` tags or manual `workflow_dispatch` and builds five artifacts in parallel into a draft Release:
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) runs on tag pushes (both `4.5.0` and `v4.5.0` work) or manual `workflow_dispatch`, building five artifacts plus a checksum file in parallel into a draft Release:
 
 | Artifact | Runner |
 | --- | --- |
@@ -61,8 +61,43 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 | `SJTURunningMan_<ver>_linux_amd64.deb` | ubuntu-24.04 |
 | `SJTURunningMan_<ver>_linux_arm64.deb` | ubuntu-24.04-arm |
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest (self-signed) |
+| `SHA256SUMS.txt` | generated in the release job |
 
 Python is pinned to 3.14.6. Both debs are built on Ubuntu 24.04 — PySide6's aarch64 wheel is `manylinux_2_39`, requiring glibc ≥ 2.39, which 22.04 does not provide.
+
+**Correct order**: push tag → workflow builds → draft release created with all artifacts → human review → publish. Do not create the release manually first and then push the tag: `action-gh-release` would update the existing release, and `draft: true` would flip a published one back to draft.
+
+#### Verifying artifacts
+
+Every build job generates a **provenance attestation** via `actions/attest-build-provenance`. The certificate is issued by GitHub OIDC and bound to this workflow run and commit, so it **cannot be forged locally**. Users can verify with:
+
+```bash
+# requires gh CLI 2.49+
+gh attestation verify SJTURunningMan_<ver>_windows.exe --repo JackyTJie/SJTURunningMan_Advanced_Edition
+```
+
+Note this proves **build provenance**, not trustworthiness — anyone able to trigger the workflow can also produce a valid attestation. The Android APK additionally carries a self-signature, which is a separate guarantee.
+
+#### Permissions
+
+The workflow default is `contents: read`; write access is elevated per job. The `release` job needs `contents: write`; the five build jobs each need `id-token: write` (to mint the OIDC token) and `attestations: write` (to store the attestation). This keeps the sensitive OIDC permission off jobs like `meta` that don't need it.
+
+#### Auto-generated release body
+
+After a tag push, the draft's body is assembled by the `release` job with a fixed structure:
+
+| Section | Source |
+| --- | --- |
+| Title, release date | Date comes from the **tag's commit time**, which is closer to the intended meaning than the workflow run time |
+| Platforms and versions | Desktop uses the tag version; Android / HarmonyOS are read from their own project files (`versionName` in `build.gradle.kts` and `app.json5`) — if unreadable the field shows `?` rather than failing |
+| Collapsible **What's Changed** | Generated via GitHub's `releases/generate-notes` API |
+| **New features / Improvements / Fixes / Credits** | **Empty sections with `<!-- hints -->`** for the maintainer to fill in before publishing |
+| **Download table** | Per-platform links and SHA256, plus verification instructions |
+
+Two details:
+
+- `generate_release_notes` is **off** — we fetch What's Changed ourselves and place it inside `<details>`; leaving it on would append a second copy at the end;
+- `append_body` defaults to off, so re-running **overwrites** the body instead of accumulating, which is why a re-run won't produce duplicate tables.
 
 ### Secrets required before releasing
 
