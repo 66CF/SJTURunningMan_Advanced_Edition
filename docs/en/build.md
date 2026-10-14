@@ -82,7 +82,22 @@ Note this proves **build provenance**, not trustworthiness — anyone able to tr
 
 The workflow default is `contents: read`; write access is elevated per job. The `release` job needs `contents: write`; the five build jobs each need `id-token: write` (to mint the OIDC token) and `attestations: write` (to store the attestation). This keeps the sensitive OIDC permission off jobs like `meta` that don't need it.
 
-The release body is generated dynamically in the `release` job and contains a table of download links and SHA256 digests per platform; GitHub's generated commit list is appended after it.
+#### Auto-generated release body
+
+After a tag push, the draft's body is assembled by the `release` job with a fixed structure:
+
+| Section | Source |
+| --- | --- |
+| Title, release date | Date comes from the **tag's commit time**, which is closer to the intended meaning than the workflow run time |
+| Platforms and versions | Desktop uses the tag version; Android / HarmonyOS are read from their own project files (`versionName` in `build.gradle.kts` and `app.json5`) — if unreadable the field shows `?` rather than failing |
+| Collapsible **What's Changed** | Generated via GitHub's `releases/generate-notes` API |
+| **New features / Improvements / Fixes / Credits** | **Empty sections with `<!-- hints -->`** for the maintainer to fill in before publishing |
+| **Download table** | Per-platform links and SHA256, plus verification instructions |
+
+Two details:
+
+- `generate_release_notes` is **off** — we fetch What's Changed ourselves and place it inside `<details>`; leaving it on would append a second copy at the end;
+- `append_body` defaults to off, so re-running **overwrites** the body instead of accumulating, which is why a re-run won't produce duplicate tables.
 
 ### Secrets required before releasing
 

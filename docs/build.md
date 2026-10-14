@@ -82,7 +82,22 @@ gh attestation verify SJTURunningMan_<ver>_windows.exe --repo JackyTJie/SJTURunn
 
 工作流全局只有 `contents: read`，写权限按作业提升：`release` 作业要 `contents: write`；五个构建作业各要 `id-token: write`（换 OIDC token）与 `attestations: write`（存证）。这样敏感的 OIDC 权限不会落在 `meta` 这类不需要它的作业上。
 
-Release 正文由 `release` 作业动态生成，含各平台产物的下载链接与 SHA256 表格，GitHub 自动生成的提交列表追加在后面。
+#### Release 正文自动生成
+
+推 tag 之后，草稿的正文由 `release` 作业动态拼出来，结构固定：
+
+| 部分 | 来源 |
+| --- | --- |
+| 标题、发布时间 | 时间取 **tag 指向提交的时间**，比工作流运行时间更贴近语义 |
+| 适用平台与版本号 | 桌面端用 tag 版本；Android / HarmonyOS 从各自工程文件读（`build.gradle.kts` 的 `versionName`、`app.json5` 的 `versionName`）—— 读不到就显示 `?`，不会失败 |
+| `<details>` 折叠的 **What's Changed** | 调 GitHub 的 `releases/generate-notes` 接口生成 |
+| **新功能 / 优化 / 修复 / 致谢** | **空段落 + `<!-- 提示 -->`**，发布会前手写 |
+| **下载表格** | 各平台产物的链接与 SHA256，附完整性 / 来源证明的校验说明 |
+
+两个注意点：
+
+- `generate_release_notes` 是**关闭**的 —— What's Changed 是我们自己取来放进 `<details>` 的，开着会在正文末尾再追加一份，重复；
+- `append_body` 默认关闭，重跑会**覆盖**正文而不是往后堆，所以改完正文重跑不会出现两份表格。
 
 ### 发布前需要配置的 Secrets
 
