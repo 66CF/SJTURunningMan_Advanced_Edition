@@ -483,7 +483,7 @@ jobs:
               ("_macOS.dmg",       "macOS"),
               ("_linux_amd64.deb", "Linux (x86_64)"),
               ("_linux_arm64.deb", "Linux (aarch64)"),
-              ("_android.apk",     "Android（自签名 APK）"),
+              ("_android.apk",     "Android"),
           ]
 
           sums = {}
@@ -533,7 +533,7 @@ jobs:
               "",
               "## 新功能",
               "",
-              "<!-- 逐条写：做了什么、解决什么问题。本节没内容就整段删掉 -->",
+              "<!-- 逐条写：做了什么、解决什么问题 -->",
               "",
               "## 优化",
               "",
@@ -545,7 +545,7 @@ jobs:
               "",
               "## 致谢",
               "",
-              "<!-- @某人：做了什么。没有就整段删掉 -->",
+              "<!-- @某人：做了什么 -->",
               "",
               "---",
               "",
@@ -557,7 +557,6 @@ jobs:
           for label, name, digest in rows:
               lines.append(f"| {label} | [{name}]({url(name)}) | `{digest}` |")
 
-          # 验证方法只放一行指路，不铺开写 —— 普通用户不看，需要的会去查文档
           lines += [
               "",
               f"校验值也可以直接下载 [SHA256SUMS.txt]({url('SHA256SUMS.txt')}) 后本地核对。",
