@@ -396,16 +396,19 @@ jobs:
     permissions:
       contents: write          # 只有这里需要写权限（创建 release 与上传附件）
     steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-          merge-multiple: true
-
+      # checkout 必须放在 download-artifact 之前 —— actions/checkout 默认会
+      # 清理工作区（git clean -ffdx），后跑会把刚下载的 artifacts/ 一起删掉，
+      # 后面所有引用 artifacts/ 的步骤都会报 "No such file or directory"。
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.meta.outputs.tag }}
           # 只需要读两个版本号文件，不用全历史
           fetch-depth: 1
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
 
       - name: 取发布日期与 What's Changed
         env:
