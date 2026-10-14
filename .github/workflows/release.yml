@@ -130,8 +130,15 @@ jobs:
           ARCHS=$(lipo -archs dist/SJTURunningMan.app/Contents/MacOS/SJTURunningMan)
           echo "app archs: $ARCHS"
           echo "$ARCHS" | grep -q x86_64 && echo "$ARCHS" | grep -q arm64 || { echo "not universal2"; exit 1; }
+          # 先铺 staging 目录：app + 指向 /Applications 的软链接。
+          # 直接 -srcfolder dist/SJTURunningMan.app 只会把 app 本体塞进 DMG，
+          # 用户打开后看不到 Applications 文件夹，无法拖拽安装。
+          rm -rf dmg_stage
+          mkdir -p dmg_stage
+          cp -R dist/SJTURunningMan.app dmg_stage/
+          ln -s /Applications dmg_stage/Applications
           hdiutil create -volname "SJTURunningMan ${VERSION}" \
-            -srcfolder dist/SJTURunningMan.app -ov -format UDZO \
+            -srcfolder dmg_stage -ov -format UDZO \
             "SJTURunningMan_${VERSION}_macOS.dmg"
       - name: 生成来源证明
         uses: actions/attest-build-provenance@v4
