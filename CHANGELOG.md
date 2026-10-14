@@ -8,6 +8,25 @@
 
 - **电脑版 / iOS** — **版本号对齐**：电脑版 `v4.4.0` → `v4.5.0`，iOS `MARKETING_VERSION` `1.0` → `4.5.0`，与安卓一致。纯版本号变更，无功能改动。
 
+### v4.4.3 — 2026-10-13
+
+- **iOS** — **功能与电脑版 / 安卓对齐**：补齐参数配置、任务状态、路线管理与「说明」弹窗；`MainView` / `MainViewModel` 重写，新增 `Components.swift`、`Dialogs.swift`、`Theme.swift`、`TaskModels.swift`。
+- **iOS** — 新增 **GitHub Release 更新检查**（`UpdateChecker.swift`）。
+- **iOS** — 适配 **iOS 27** 的界面规范（字体、圆角、间距）。
+
+### v4.4.2 — 2026-10-13
+
+- **安卓** — **界面重做并与电脑版功能对齐**：Compose 界面重构，新增深色主题（`values-night`）与任务状态、路线管理模型。
+- **安卓** — **release 签名**配置就绪（keystore 由 CI 注入），新增仪器化测试依赖，API 迁移到 **Material3**。
+- **安卓** — 把模板测试换成真实的 `DataGeneratorTest` 与 `UpdateCheckerTest`（本仓库最早的自动化测试）。
+- **仓库** — 取消跟踪 IDE 状态与构建产物，扩充 `.gitignore`。
+
+### v4.4.1 — 2026-09-26
+
+- **电脑版** — 「说明」弹窗新增 **GitHub Release 更新检查**，新增 `src/update_checker.py`。
+- **仓库** — 新增 `release.yml`：打 tag 自动构建 Windows / macOS / Linux 三平台产物，生成**草稿** Release 供人工审核。
+- **仓库** — 移除未使用的 `Agent-Skill/` 目录。
+
 ### v4.4.0 — 2026-09-25「秋是」游园会
 
 - **电脑版** — **地图引擎可选**：路线规划器与路线预览支持在「百度地图（默认）」与「OpenStreetMap」之间切换，选择位于路线预览框内。
