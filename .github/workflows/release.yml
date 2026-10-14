@@ -318,8 +318,15 @@ jobs:
         env:
           V: ${{ needs.meta.outputs.version }}
         run: |
-          IFS=. read -r MA MI PA <<< "$V"
-          NAME="$V"
+          # 先把预发布后缀去掉再算 versionCode：tag 可能是 4.5.0-rc.1 / 4.4.2-dryrun
+          # 这类写法，直接按 "." 拆会得到 "0-rc" 这种非数字，$(( )) 会报语法错误中断。
+          BASE="${V%%-*}"      # 4.5.0-rc.1 -> 4.5.0
+          BASE="${BASE%%+*}"   # 顺带去掉 build metadata
+          IFS=. read -r MA MI PA <<< "$BASE"
+          # 再各自剔掉非数字字符，防止 4.4.2.1 这种多段写法
+          MA="${MA//[!0-9]/}"; MI="${MI//[!0-9]/}"; PA="${PA//[!0-9]/}"
+
+          NAME="$V"            # versionName 保留完整 tag，预发布信息有意义
           CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
