@@ -1092,7 +1092,7 @@ fn save_snapshot(ui: &AppWindow, path: &Path) -> Result<(), Box<dyn std::error::
     // 直接存会让 PNG 在遵守 alpha 的查看器里整张透明、看起来像空白截图。
     // 窗口本身不透明，统一补成 255。
     let mut bytes = pixels.as_bytes().to_vec();
-    for pixel in bytes.chunks_exact_mut(4) {
+    for pixel in bytes.as_chunks_mut::<4>().0 {
         pixel[3] = 255;
     }
     image::save_buffer(
