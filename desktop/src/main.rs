@@ -1088,9 +1088,16 @@ fn smoke_pages(weak: slint::Weak<AppWindow>, dir: PathBuf, index: usize) {
 
 fn save_snapshot(ui: &AppWindow, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let pixels = ui.window().take_snapshot()?;
+    // 快照的 alpha 通道实测未被填充（Windows 与 Linux 的 CI 产物都是全 0），
+    // 直接存会让 PNG 在遵守 alpha 的查看器里整张透明、看起来像空白截图。
+    // 窗口本身不透明，统一补成 255。
+    let mut bytes = pixels.as_bytes().to_vec();
+    for pixel in bytes.chunks_exact_mut(4) {
+        pixel[3] = 255;
+    }
     image::save_buffer(
         path,
-        pixels.as_bytes(),
+        &bytes,
         pixels.width(),
         pixels.height(),
         image::ColorType::Rgba8,
