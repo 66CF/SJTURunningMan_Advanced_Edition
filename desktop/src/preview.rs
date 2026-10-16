@@ -122,11 +122,26 @@ pub fn render(points: &[Point], dark: bool) -> slint::Image {
     slint::Image::from_rgba8(buffer)
 }
 
+/// 验证码图片来自网络，字节数有上限不代表解码后内存可控，尺寸限制见 `api::decode_captcha`。
 pub fn decode(bytes: &[u8]) -> Result<slint::Image, String> {
-    let image = image::load_from_memory(bytes)
-        .map_err(|_| "无法显示图形验证码，请刷新")?
-        .into_rgba8();
+    let image = sjturunningman::api::decode_captcha(bytes)?.into_rgba8();
     Ok(slint::Image::from_rgba8(
         slint::SharedPixelBuffer::clone_from_slice(image.as_raw(), image.width(), image.height()),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn captcha_decoding_is_bounded_and_rejects_junk() {
+        let oversized = image::DynamicImage::ImageRgb8(image::RgbImage::new(4_000, 8));
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        oversized
+            .write_to(&mut buffer, image::ImageFormat::Png)
+            .unwrap();
+        assert!(decode(&buffer.into_inner()).is_err());
+        assert!(decode(b"not an image").is_err());
+    }
 }

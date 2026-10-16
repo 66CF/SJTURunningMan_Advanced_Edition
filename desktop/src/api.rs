@@ -46,6 +46,25 @@ pub fn network_error(error: reqwest::Error) -> String {
     }
 }
 
+/// 验证码图片来自网络：字节数上限不保证解码后内存可控，这里同时限制解码尺寸。
+const MAX_CAPTCHA_WIDTH: u32 = 2_048;
+const MAX_CAPTCHA_HEIGHT: u32 = 1_024;
+const MAX_CAPTCHA_ALLOC: u64 = 16 * 1024 * 1024;
+
+pub fn decode_captcha(bytes: &[u8]) -> Result<image::DynamicImage, String> {
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|_| "验证码接口未返回有效图片，请刷新重试".to_owned())?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_CAPTCHA_WIDTH);
+    limits.max_image_height = Some(MAX_CAPTCHA_HEIGHT);
+    limits.max_alloc = Some(MAX_CAPTCHA_ALLOC);
+    reader.limits(limits);
+    reader
+        .decode()
+        .map_err(|_| "验证码接口未返回有效图片，请刷新重试".to_owned())
+}
+
 fn checked(response: Result<Response, reqwest::Error>) -> Result<Response, String> {
     response
         .and_then(Response::error_for_status)
@@ -118,7 +137,7 @@ impl Session {
         if image.len() > 512 * 1024 {
             return Err("验证码图片过大".into());
         }
-        image::load_from_memory(&image).map_err(|_| "验证码接口未返回有效图片，请刷新重试")?;
+        decode_captcha(&image)?;
         Ok(image)
     }
 
