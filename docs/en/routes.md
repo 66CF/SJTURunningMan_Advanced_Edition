@@ -32,26 +32,26 @@ The desktop planner picks points on OSM (WGS84) and **converts each click to BD0
 
 ## Route planner (desktop)
 
-1. Click "Design/Update route" on the main screen; `route_planner.html` opens in your browser.
+1. Click "Design route" on the main screen to open the embedded planner over loopback HTTP. Keep the client running to reload it, and reopen from the app after restarting the client.
 2. Click points on the OpenStreetMap to trace a route.
 3. You can **add, remove individual points, or clear all points**.
 4. Click "Download route txt" to get `custom_route.txt`.
-5. Back in the main window, choose "Custom…" in the **Preset route** dropdown and import it.
+5. Back in the main window, click **Import TXT** to import it.
 
-The route is copied into the **`Routes/` folder next to the executable** and survives restarts.
+The route is copied into the **`routes/` folder in the OS user data directory** (see [desktop.md](desktop.md)) and survives restarts.
 
 ## Built-in routes and the quarantine folder
 
 - Only `assets/Routes/default.txt` ships as a built-in route today.
 - The remaining historical routes moved to `assets/Routes/NeedsReview/` (`BigLawn`, `BotanicalGarden`, `HanzeLake`, `NanTi`, `SiyuanLake`) pending manual verification of jump segments, length and endpoints.
-- Routes you import yourself are unaffected and still land in `Routes/`.
+- Routes you import yourself are copied into the user data directory’s `routes/` folder.
 
 > ⚠️ `assets/Routes/NeedsReview/` is a quarantine area. **Do not** move entries back into the built-in list directly — several have jump or length defects that must be validated first.
 
 ## Verifying a route
 
-1. Select it in the desktop "Preset route" dropdown.
-2. Click "Preview route" (no login needed).
+1. Select it in the desktop "Select route" dropdown.
+2. Click "Preview actual track", then "Open in map" (no login needed).
 3. Check on the OSM map:
    - Any red highlighted segment means a jump (> 150 m);
    - Whether the green start and red finish are close together;
@@ -68,7 +68,7 @@ A route with no red segments and close endpoints is a valid built-in candidate.
 
 ## Deleting an imported route
 
-The "Delete" button next to the preset route dropdown removes a route from `Routes/`.
+The "Delete" button on the Routes page removes a copy from the user data directory’s `routes/` after confirmation; the imported source remains untouched.
 
-- Built-in `default.txt` and legacy `user.txt` are **protected** and cannot be deleted.
+- Built-in `default` is **protected**. Legacy `user.txt` must be imported manually.
 - Importing a duplicate name appends `_1`, `_2`, etc. instead of overwriting.

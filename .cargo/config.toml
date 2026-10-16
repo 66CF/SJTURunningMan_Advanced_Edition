@@ -1,0 +1,3 @@
+[target.x86_64-pc-windows-msvc]
+# Windows 发布包静态链接 CRT，避免额外安装 Visual C++ 运行库。
+rustflags = ["-C", "target-feature=+crt-static"]

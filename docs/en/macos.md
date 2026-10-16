@@ -8,14 +8,14 @@ For shared behaviour (parameters, route preview, upload flow, data generation) s
 
 | Item | Requirement |
 | --- | --- |
-| macOS | **14 (Sonoma) or later** |
+| macOS | Build deployment target: **11.0**; actual compatibility needs macOS validation |
 | Architecture | One universal build covers both Apple Silicon and Intel |
 
-> ⚠️ The minimum macOS version is set by PySide6. From PySide6 6.12 onward the official wheel's deployment target moved from `macosx_13_0` to `macosx_14_0`, so this project (PySide6 ≥ 6.12) requires **macOS 14+**. On macOS 13 or earlier, use an older release.
+> The Rust + Slint build no longer depends on PySide6. CI builds Intel and Apple Silicon targets separately and combines them. This migration was implemented on Windows; macOS build, installation, and runtime remain unverified.
 
 ## Install
 
-1. Download `SJTURunningMan-<version>-macOS-universal.dmg` from [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases).
+1. Download `SJTURunningMan_<version>_macOS.dmg` from [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases).
 2. Double-click to mount it, then drag **SJTURunningMan.app** into **Applications**.
 
 ![Drag to install](../images/macos-install-dmg.webp)
@@ -68,33 +68,18 @@ xattr -d com.apple.quarantine /Applications/SJTURunningMan.app
 ## Uninstall
 
 1. Drag `/Applications/SJTURunningMan.app` to the Trash.
-2. The app is portable; its state lives in the `Routes/` folder next to it and in temp directories. To be thorough:
-
-```bash
-ls ~/Library/Application\ Support/ | grep -i sjtu
-ls ~/Library/Preferences/ | grep -i sjtu
-```
-
-Delete anything left over.
+2. Preferences, route copies, and generated HTML live in `~/Library/Application Support/cn.sjtu.SJTURunningMan`. Remove that directory only if you also want to remove those local files.
 
 ## Running from source
 
-The same as Windows — see [build.md](./build.md#desktop):
+Install stable Rust (1.95+) and Xcode Command Line Tools, then:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python qtui.py
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
 ```
 
-Packaging:
-
-```bash
-python -m PyInstaller --clean --noconfirm ./main.spec
-```
-
-On macOS `main.spec` produces a universal2 `.app` with the `assets/SJTURM.icns` icon.
+For Intel/Apple Silicon target builds, lipo, signing, and DMG packaging, see [build.md](build.md#desktop). Python runs only the packaging script and is not bundled in the application.
 
 ## Troubleshooting
 
@@ -103,7 +88,7 @@ On macOS `main.spec` produces a universal2 `.app` with the `assets/SJTURM.icns` 
 | **"Apple could not verify…"** | See above: System Settings → Privacy & Security → Open Anyway |
 | **"App is damaged" / Move to Trash** | The download is incomplete — download again; if it persists, use the `xattr -d` command above |
 | **Asks for Rosetta** | It shouldn't. The universal build contains both architectures; if you're asked, you have an old build — download again |
-| **Crashes on launch** | Confirm macOS 14+; check the crash log via Console (Applications → Utilities → Console), search for `SJTURunningMan` |
+| **Crashes on launch** | Check the package’s deployment target and version; check the crash log via Console (Applications → Utilities → Console), search for `SJTURunningMan` |
 | **Generic icon** | Quit, remount the DMG and drag again; running the executable from `dist/` directly will not carry the icon |
 
 Other functional issues: [faq.md](./faq.md).

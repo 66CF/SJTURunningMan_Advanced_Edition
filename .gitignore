@@ -153,6 +153,10 @@ ui_settings.json
 # =========================
 # Other
 # =========================
+/target/
+/desktop/target/
+/.playwright-cli/
+/output/playwright/
 *.log
 *.tmp
 *.temp

@@ -6,7 +6,7 @@
 
 | 平台 | 目录 | 语言 / 框架 |
 | --- | --- | --- |
-| 电脑版 | 仓库根（`qtui.py`、`src/`、`utils/`） | Python + PySide6 |
+| 电脑版 | `desktop/`（根 Cargo workspace） | Rust + Slint |
 | 安卓 | `apps/android/` | Kotlin + Jetpack Compose |
 | iOS | `apps/ios/` | Swift + SwiftUI |
 | 鸿蒙 | `apps/harmonyos/` | ArkTS |
@@ -20,10 +20,8 @@
 ### 电脑版
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python qtui.py
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
 ```
 
 ### 安卓

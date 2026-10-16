@@ -4,7 +4,7 @@ The four platforms build independently. Build only the one you changed.
 
 | Platform | Directory | Toolchain | Artifact |
 | --- | --- | --- | --- |
-| Desktop | repository root | Python + PyInstaller | `.exe` / `.dmg` / `.deb` |
+| Desktop | repository root | Rust + Slint / Cargo | `.exe` / `.dmg` / `.deb` |
 | Android | `apps/android/` | Gradle 9.4.1 + AGP 8.13.0 + Kotlin 2.2.10 | `.apk` / `.aab` |
 | iOS | `apps/ios/` | Xcode 16+ | `.ipa` |
 | HarmonyOS | `apps/harmonyos/` | DevEco Studio / hvigor | `.hap` |
@@ -13,42 +13,38 @@ The four platforms build independently. Build only the one you changed.
 
 ## Desktop
 
-### Environment
+### Native desktop
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+# Current stable Rust (1.95+); Cargo.lock pins dependencies
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
+cargo build --release --locked
 ```
 
-### Run directly
+Windows: install Rust 1.95+ plus MSVC Build Tools or MinGW-w64. `./build_windows.ps1` creates `dist/SJTURunningMan.exe`. The MSVC target uses static CRT via `.cargo/config.toml`; this session tested the GNU toolchain.
+
+macOS (Xcode command line tools required):
 
 ```bash
-python qtui.py
+rustup target add x86_64-apple-darwin aarch64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target x86_64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target aarch64-apple-darwin
+mkdir -p dist
+lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
+python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 ```
 
-### Package
-
-**Windows**
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build_windows.ps1
-```
-
-**All platforms (equivalent)**
+Linux (Ubuntu 24.04, X11 / Wayland):
 
 ```bash
-python -m PyInstaller --clean --noconfirm ./main.spec
+sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libwayland-dev
+cargo build --release --locked
+python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
+# ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`main.spec` notes:
-
-- Entry point `qtui.py`; the whole `assets/` directory is bundled.
-- Icon is `assets/SJTURM.ico` on Windows, `assets/SJTURM.icns` on macOS.
-- The macOS artifact is `universal2` (Intel + Apple Silicon).
-- Version comes from the `APP_VERSION` environment variable, defaulting to `4.5.0` locally.
-
-> ⚠️ Do not run `pyinstaller qtui.py` directly — you lose the icon and bundled assets.
+`APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` reads `src/config.py`. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The old `qtui.py`, `main.spec`, and `requirements.txt` remain for comparison.
 
 ### Automated release
 
@@ -63,7 +59,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest (self-signed) |
 | `SHA256SUMS.txt` | generated in the release job |
 
-Python is pinned to 3.14.6. Both debs are built on Ubuntu 24.04 — PySide6's aarch64 wheel is `manylinux_2_39`, requiring glibc ≥ 2.39, which 22.04 does not provide.
+Desktop builds use stable Rust with Cargo.lock. Both debs are built on Ubuntu 24.04 and declare glibc ≥ 2.39. macOS builds combine two Rust targets with lipo; Windows builds embed the existing icon. The app has no Python runtime dependency.
 
 > **iOS and HarmonyOS NEXT are not part of this pipeline**, and Releases ships no prebuilt packages for them — both are built by hand today:
 >

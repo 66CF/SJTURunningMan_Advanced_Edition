@@ -9,8 +9,11 @@ SJTU 一键校园跑工具 —— 用于研究运动数据记录与上传流程�
 ## 仓库布局
 
 ```
-qtui.py                电脑版 GUI 入口（唯一入口，约 88 KB）
-src/                   电脑版业务模块
+desktop/               Rust + Slint 电脑版（src/main.rs 入口、ui/app.slint 界面）
+Cargo.toml             桌面 Cargo workspace；Cargo.lock 固定依赖
+scripts/package_desktop.py  macOS app/dmg 与 Linux deb 打包
+qtui.py                旧 Qt 入口，保留作迁移对照
+src/                   旧 Python 业务模块；config.py 仍提供桌面版本号
   api_client.py        上传 / 认证 HTTP（含伪装 UA）
   data_generator.py    轨迹生成 + 内嵌路线规划器 HTML
   login.py             登录与验证码
@@ -20,8 +23,8 @@ src/                   电脑版业务模块
   info_dialog.py       说明弹窗（import assets.resources_rc）
 utils/auxiliary_util.py
 assets/                图标、背景、内置路线（assets/Routes/）
-main.spec              PyInstaller 配置
-build_windows.ps1      Windows 打包脚本
+main.spec              旧 PyInstaller 配置，默认发布不再使用
+build_windows.ps1      Rust Windows Release 构建并复制到 dist/
 route_planner.html     电脑版路线规划器（Leaflet + OSM）
 apps/android/          安卓（Kotlin + Compose）
 apps/ios/              iOS（Swift + SwiftUI）
@@ -32,7 +35,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 
 ## 改动边界（重要）
 
-1. **四个平台互不引用。** 全仓验证过：根目录 Python 代码、`release.yml`、`main.spec`、`build_windows.ps1` 都**不引用** `apps/` 下的任何路径。改一个平台不要顺手改另一个。
+1. **四个平台业务互不引用。** Rust 桌面代码不引用 `apps/`；`release.yml` 分别构建桌面与安卓。改一个平台不要顺手改另一个。
 2. **`src/config.py` 的 `global_version` 只代表电脑版**，与移动端版本号无关。各平台版本号位置见 [CONTRIBUTING.md](CONTRIBUTING.md#版本号)。
 3. **`assets/resources_rc.py` 是真实依赖**，不是可删的构建产物 —— `src/info_dialog.py` 直接 import 它，`main.spec` 也把它列进 hiddenimports。没有对应的 `.qrc` 源文件，这个生成文件就是唯一来源。
 4. **`assets/Routes/NeedsReview/` 是隔离区。** 里面的路线有跳段 / 长度 / 起终点问题，不要直接把它们加回内置列表。
@@ -41,7 +44,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 
 ## 四套实现的对应关系
 
-同一份逻辑在每个平台各写一遍，按名字找对应文件：
+同一份逻辑在每个平台各写一遍。Rust 桌面模块在 `desktop/src/`：`task.rs`（生成与任务）、`api.rs`（登录与网络）、`route.rs`（路线与地图 HTML）、`maps.rs`（按需提供浏览器地图的本机 HTTP 服务）、`settings.rs`（参数）、`update.rs`（更新）。下面保留旧 Python 模块与移动端的对应表：
 
 | 职责 | 电脑版 | 安卓 | iOS | 鸿蒙 |
 | --- | --- | --- | --- | --- |
@@ -58,12 +61,13 @@ docs/                  用户文档（中文主 + en/ 镜像）
 
 ```bash
 # 电脑版
-python qtui.py
-python -m PyInstaller --clean --noconfirm ./main.spec
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
+cargo build --release --locked
 
 # 安卓
 cd apps/android && ./gradlew assembleDebug
-cd apps/android && ./gradlew test                 # 单元测试（唯一有自动化测试的平台）
+cd apps/android && ./gradlew test                 # 安卓单元测试
 
 # iOS
 xcodebuild -project apps/ios/SJTURunningMan.xcodeproj -list
@@ -74,7 +78,7 @@ cd apps/harmonyos && hvigorw assembleHap
 
 ## 测试现状
 
-只有安卓有自动化测试（`apps/android/app/src/test/` 的 `DataGeneratorTest`、`UpdateCheckerTest`，以及 `androidTest/` 的仪器测试）。电脑版 / iOS / 鸿蒙无测试，改动后按 [docs/testing.md](docs/testing.md) 的手动清单验收。CI 不跑测试。
+Rust 电脑版有单元测试、本地 HTTP mock 和 `--smoke-test` 截图验收。`desktop-check.yml` 在三个系统运行检查，桌面 release 作业先测试再打包。安卓保留既有单元及仪器测试。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
 
 ## 修改约定
 

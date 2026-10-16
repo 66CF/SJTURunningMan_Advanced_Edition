@@ -1,160 +1,55 @@
-# 电脑版使用指南
+# 电脑版（Windows / macOS / Linux）
 
-适用于 Windows / macOS / Linux 桌面版，当前版本 **`v4.5.0`**（版本号来自 `src/config.py` 的 `global_version`）。
+电脑版使用 **Rust + Slint** 原生界面，主入口是 `desktop/src/main.rs`。不依赖 Python、Qt 或 WebView；路线与规划器资源编译进可执行文件。旧版 `qtui.py` 与 `src/` 保留供迁移对照，默认构建和发布已切换到 Rust。
 
-![电脑版主界面](./images/desktop-main.webp)
+## 启动与使用
 
-## 目录
+下载对应系统的安装包。Windows 直接运行 exe；macOS 将应用拖入 Applications；Linux 安装对应架构的 deb。首次启动必须阅读并勾选使用承诺书。
 
-- [1. 安装与启动](#1-安装与启动)
-- [2. 界面总览](#2-界面总览)
-- [3. 参数说明](#3-参数说明)
-- [4. 路线预览](#4-路线预览)
-- [5. 上传流程](#5-上传流程)
-- [6. 数据生成逻辑](#6-数据生成逻辑)
-- [7. 从源码运行](#7-从源码运行)
-- [8. 打包](#8-打包)
-- [9. 使用建议](#9-使用建议)
+工作区分为「跑步工作台」「路线管理」「任务日志」「关于软件」。右上角可以切换深浅色外观。外观、跑步参数、路线选择保存在系统用户数据目录，不要求程序安装目录可写。
 
-## 1. 安装与启动
+侧栏使用软件原图标与简洁的 `RunningMan` 字标，导航选中项以柔和背景区分。「关于软件」保留检查更新，并提供带图标的 GitHub 仓库和水源社区讨论帖入口；链接通过系统浏览器打开。
 
-### Windows
+表单与下拉框统一使用紧凑的圆角控件。任务日志的说明位于标题下方，右侧独立提供「清空日志」；空日志显示占位提示，长日志可滚动查看。
 
-1. 到 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases) 下载 `SJTURunningMan.exe`；
-2. 双击运行。首次启动时 Windows SmartScreen 可能拦截 —— 点「更多信息」→「仍要运行」；
-3. 程序为绿色版，无需安装，同目录会自动生成 `Routes/` 存放导入的路线。
+1. 配置跑步次数（1–30）、单次距离（大于 0 且不超过 5 km）、结束日期（`YYYY-MM-DD`）与时间（`HH:MM:SS`）。默认日期为昨天，默认 1 次、4 km、08:00:00，按日期向前生成。
+2. 选择内置 `default`，或通过「导入 TXT」添加 BD09 路线。文本为 UTF-8，每行 `longitude,latitude`，至少 2 个不同点。文件上限 2 MB、30,000 个点。导入保留独立副本；删除只影响导入副本，内置路线不能删除。
+3. 点击「预览实际轨迹」，无需登录或网络即可生成并查看目标距离的轨迹。红色起终点之外的红色线段表示超过 150 m 的跳段。原始路线超过目标距离时自动截取；较短的开放路线往返，闭合路线循环。
+4. 「在地图中打开」通过系统浏览器查看当前预览；尚未生成预览时显示原始路线。地图使用仅监听 `127.0.0.1` 的本机 HTTP 页面，正常发送 OSM 要求的来源信息；在线瓦片与 Leaflet 需要网络，加载失败会提示，界面内的离线轨迹仍可使用。刷新地图时需保持客户端运行；重启客户端后请从按钮重新打开地图。
+5. 「设计路线」在浏览器打开现有 OSM 规划器；导出 TXT 后通过「导入 TXT」添加。`NeedsReview/` 隔离路线不参与内置列表。
+6. 点击「登录账号」，填写 JAccount 账号和密码，图形验证码沿用旧版服务**自动识别**。识别服务异常时可刷新重试，或使用手动备用输入。按需完成交我办 / 邮箱 / 短信二次验证。识别请求仅发送验证码图片，不附带账号、密码或登录 Cookie；图片与识别结果不写磁盘。
+7. 工作台底部提供进度与任务操作；其他页面仅在任务运行时显示状态及停止按钮。预览并检查参数后，点击「开始任务」并确认。任务在后台线程运行；日志与进度实时更新。实际上传生成的 payload 会更新界面预览。POST 失败不自动重试，避免重复记录。
+8. 「停止任务」阻止后续上传；正在进行的 HTTP 请求最多等待 15 秒。任务中关闭窗口会先停止，等待当前请求结束后退出。
 
-### macOS
+## 数据与隐私
 
-1. 下载 `SJTURunningMan-<版本>-macOS-universal.dmg`；
-2. 挂载后把 `SJTURunningMan.app` 拖入「应用程序」。
+账号、密码、验证码与 Cookie / token 只保存在进程内存中，退出账号或关闭程序后清除；日志只保留最近 250 行，不写磁盘。偏好设置不包含账号凭据。
 
-首次打开会被 Gatekeeper 拦截，需要在 **系统设置 → 隐私与安全性** 里放行 —— **完整步骤与截图见 [macos.md](./macos.md)**。
+用户数据目录：
 
-> 要求 **macOS 14 或更高**；Apple Silicon 与 Intel 都在同一份 universal 包里，无需区分。
+- Windows：`%LOCALAPPDATA%\sjtu\SJTURunningMan\data`。
+- macOS：`~/Library/Application Support/cn.sjtu.SJTURunningMan`。
+- Linux：`${XDG_DATA_HOME:-~/.local/share}/sjturunningman`。
 
-### Linux
+该目录包含 `settings.json` 与 `routes/`。地图 HTML 只保存在内存中，由按需启动的本机服务提供，不开放文件目录；服务随客户端退出而关闭。旧版程序目录中的 `Routes/`、`user.txt` 和 `ui_settings.json` 不会自动迁移；通过导入 TXT 迁移路线即可。
 
-下载 `.deb` 包后安装：
+## 构建与验证
 
 ```bash
-sudo dpkg -i SJTURunningMan_<版本>_linux.deb
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
+cargo build --release --locked
+# 自动进行离线预览、参数校验，并截取各页面后退出
+# Windows 文件名增加 .exe
+./target/release/sjturunningman --smoke-test target/smoke
 ```
 
-## 2. 界面总览
+Windows 可运行 `./build_windows.ps1`，产物为 `dist/SJTURunningMan.exe`。三系统打包见 [build.md](build.md)。自动测试不会提交真实账号或运动记录；Windows 下另经授权实测了账号登录、交我办二次验证与校园跑只读授权，未测试上传。详见 [验证记录](desktop-validation.md) 与 [验收清单](testing.md)。
 
-启动后需要先阅读并勾选承诺书，之后进入主界面：
+## 轻量化设计
 
-| 区域 | 内容 |
-| --- | --- |
-| 用户配置区 | JAccount 用户名、密码输入框（密码以星号隐藏） |
-| 上传设置区 | 跑步次数、跑步时间、结束日期、跑步距离、预设路线 |
-| 功能按钮 | 开始生成并上传、停止任务、设计/更新路线、预览路线、GitHub、水源、说明 |
-| 实时反馈区 | 进度条、状态标签、启动警告/运行日志、路线预览摘要 |
+仅启用 Slint `winit` 窗口后端与软件渲染；不携带 Qt、Skia、Chromium、Python 或整套背景资源。路线视图本地绘制，网络操作按用户动作触发。Release 使用体积优化、LTO 和符号裁剪。体积和启动耗时应以各系统的实际 Release 构建测量，不将 Debug 产物或旧版本下载包视为同条件基准。
 
-界面采用背景图 + 玻璃拟态主题。
+轨迹采样保留原始拐点，避免跨弯道导致距离变短。当前实现保留旧桌面端的坐标校准、固定 200 m 距离补偿与 payload 字段，并重写了路线采样器；不是与 Python 逐位相同的随机轨迹。手机端未修改。
 
-## 3. 参数说明
-
-| 参数 | 格式 | 范围 / 默认 | 说明 |
-| --- | --- | --- | --- |
-| 用户名 | 文本 | — | JAccount 学号 |
-| 密码 | 文本 | — | JAccount 密码，输入时星号隐藏 |
-| 跑步次数 | 正整数 | 1–30，默认 1 | 生成多少条记录 |
-| 跑步时间 | `HH:MM:SS` | 默认 `08:00:00` | 每条会加上 ±10 分钟、±30 秒的随机波动，更自然 |
-| 结束日期 | `YYYY-MM-DD` | 默认昨天 | 以这天为最新一条，向前连续生成 |
-| 跑步距离 | 数字（km） | 最大 5，默认 4 | 每条记录的目标距离 |
-| 预设路线 | 下拉 | 内置 `default.txt` / 旧版 `user.txt` / 「自定义...」 | 鼠标滚轮不会误切换路线 |
-
-所有输入都带格式校验，不合法会就地提示。
-
-## 4. 路线预览
-
-电脑版独有的能力：**上传前即可离线预览**。
-
-**上传前离线预览**
-
-1. 点「预览路线」；
-2. 程序按当前距离与路线设置在本地跑一遍补点、分段、时间戳生成算法 —— **无需登录，不发起任何网络请求**；
-3. 结果写入系统临时目录并用默认浏览器打开，在 OpenStreetMap 上显示路线连线、绿色起点、红色终点。
-
-**上传中 / 上传后预览**
-
-- 此时预览的是**已生成、准备上传的 payload 坐标**，而不是原始 txt 路线；
-- 摘要显示距离、点数、时长、最长单段、跳段数量与上传状态；
-- 单段大于 150 m 的跳段会红色高亮，用于发现路线文件或生成结果的异常。
-
-![路线预览](./images/desktop-preview.webp)
-
-> 预览用系统浏览器打开而不是内嵌 Qt WebEngine，是为了避免 Windows exe 体积显著增大。
-
-## 5. 上传流程
-
-**两步流程**
-
-1. **获取认证信息** —— 取得认证令牌与跑步规则；
-2. **生成并上传跑步数据** —— 逐条按配置生成轨迹数据并上传。
-
-**多天支持**
-
-- 数据生成在**过去** N 天（从昨天开始的连续 N 天），每天一个独立上传请求；
-- 显示每条进度，统计成功/失败次数，可中途点「停止任务」中断。
-
-**验证码**
-
-- 实时验证码通过外部模型自动识别，无需手动输入。
-
-**凭据校验**
-
-- 可加 `--verify-credentials` 参数只验证凭据有效性、不上传数据，便于先确认账号可用。
-
-## 6. 数据生成逻辑
-
-- **路径调整**：按目标距离与速度自动伸缩路线。路线过长时会询问是否自动削减；过短则用往返或环路补齐。起终点距离大于 15 m 用往返策略，否则用环路。
-- **GPS 校正**：自动应用坐标偏移校正以匹配地图数据，另含一层微调用于消除「地图上点选」与「实际记录」之间的偏差。
-- **轨迹分段**：把整体轨迹拆成多段模拟真实跑步，各段分配正常 / 停止 / 无效状态，并生成合理的点时间戳。
-- **本地透明**：预览在本地生成，不修改 payload 本身。
-
-## 7. 从源码运行
-
-```bash
-git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
-cd SJTURunningMan_Advanced_Edition
-
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-python qtui.py
-```
-
-依赖见 `requirements.txt`：PySide6 ≥ 6.5、requests ≥ 2.31、tenacity ≥ 8.2、urllib3 ≥ 1.26。Python 3.x 即可，CI 使用 3.14.6。
-
-启动后：填写用户名密码 → 填参数 → 选路线 → 点「开始生成并上传」。
-
-## 8. 打包
-
-请使用仓库提供的 `main.spec` 或 `build_windows.ps1`，**不要**直接 `pyinstaller qtui.py`（那样会生成默认图标）。
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build_windows.ps1
-```
-
-脚本内部调用：
-
-```powershell
-python -m PyInstaller --clean --noconfirm .\main.spec
-```
-
-`main.spec` 会以 `assets/SJTURM.ico`（macOS 下 `assets/SJTURM.icns`）作为图标，并把整个 `assets/` 目录打进程序。三个平台的自动构建见 [`.github/workflows/release.yml`](../.github/workflows/release.yml)，打 `v*` tag 触发。
-
-更多构建细节见 [build.md](./build.md)。
-
-## 9. 使用建议
-
-- 避免选 1 km 距离（大概率最后不满 1 km），推荐 **2 km 及以上**，结果更稳定；
-- 单次距离上限 5 km，请合理设置，避免触发平台校验机制；
-- 每次上传前先点「预览路线」，确认距离、跳段、起终点符合预期；
-- 如需精确控制距离，多试几次找到最合适的设置；
-- 自定义路线时保证路线长度与目标距离匹配，txt 格式为每行 `longitude,latitude`；
-- 内置路线当前仅保留 `default.txt`，其余在 `assets/Routes/NeedsReview/` 待人工校验后再恢复 —— 详见 [routes.md](./routes.md)。
+本轮构建、体积、启动计时与验证边界见 [迁移验证记录](desktop-validation.md)。

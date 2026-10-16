@@ -8,14 +8,14 @@
 
 | 项 | 要求 |
 | --- | --- |
-| macOS | **14 (Sonoma) 或更高** |
+| macOS | 构建部署目标为 **11.0**；实际兼容性待 macOS 真机验证 |
 | 架构 | Apple Silicon 与 Intel **通吃**，同一份 universal 包 |
 
-> ⚠️ 最低 macOS 版本由 PySide6 决定。从 PySide6 6.12 起，官方 wheel 的部署目标从 `macosx_13_0` 提高到 `macosx_14_0`，因此本工具自带的 PySide6 ≥ 6.12 要求 **macOS 14+**。在 macOS 13 及更早系统上请使用较早版本的发行包。
+> Rust + Slint 构建不再依赖 PySide6。工作流配置 Intel / Apple Silicon 分别构建后合并；本轮在 Windows 上实施，尚未实际验证 macOS 构建、安装和运行。
 
 ## 安装
 
-1. 到 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases) 下载 `SJTURunningMan-<版本>-macOS-universal.dmg`；
+1. 到 [Releases](https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition/releases) 下载 `SJTURunningMan_<版本>_macOS.dmg`；
 2. 双击挂载，把窗口里的 **SJTURunningMan.app** 拖到 **Applications** 文件夹；
 
 ![拖拽安装](./images/macos-install-dmg.webp)
@@ -68,33 +68,18 @@ xattr -d com.apple.quarantine /Applications/SJTURunningMan.app
 ## 卸载
 
 1. 把 `/Applications/SJTURunningMan.app` 拖进废纸篓；
-2. 应用是绿色版，配置只写在同目录的 `Routes/` 与临时目录中；如果想彻底清干净，检查：
-
-```bash
-ls ~/Library/Application\ Support/ | grep -i sjtu
-ls ~/Library/Preferences/ | grep -i sjtu
-```
-
-有残留的话一并删除。
+2. 参数、路线副本和生成的 HTML 位于 `~/Library/Application Support/cn.sjtu.SJTURunningMan`。如需连同本地数据卸载，再自行移除该目录。
 
 ## 从源码运行
 
-与 Windows 相同，见 [build.md](./build.md#电脑版)：
+安装 stable Rust（1.95+）和 Xcode Command Line Tools 后运行：
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python qtui.py
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
 ```
 
-打包：
-
-```bash
-python -m PyInstaller --clean --noconfirm ./main.spec
-```
-
-`main.spec` 在 macOS 上会自动产出 universal2 的 `.app` 并附加 `assets/SJTURM.icns` 图标。
+Intel / Apple Silicon 分别编译、lipo 合并、签名和 DMG 打包见 [build.md](build.md#电脑版)。Python 只用于运行打包脚本，不随应用分发。
 
 ## 常见问题
 
@@ -103,7 +88,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 | **「Apple could not verify…」** | 见上一节，走 系统设置 → 隐私与安全性 → 仍要打开 |
 | **提示应用已损坏 / 移到废纸篓** | 文件下载不完整，重新下载；仍不行则用上面的 `xattr -d` 命令 |
 | **提示需要 Rosetta** | 不需要。通用包已包含两种架构，若被要求说明拿到的是旧包，重新下载 |
-| **打开后闪退** | 确认系统是 macOS 14 或更高；在「访达 → 应用程序 → 实用工具 → 控制台」里搜索 `SJTURunningMan` 查看崩溃日志 |
+| **打开后闪退** | 核对当前安装包的构建目标和版本；在「访达 → 应用程序 → 实用工具 → 控制台」里搜索 `SJTURunningMan` 查看崩溃日志 |
 | **图标显示成默认图标** | 退出应用、重新挂载 DMG 再拖一次；直接运行 `dist/` 里的可执行文件不会带图标 |
 
 其他功能性问题见 [faq.md](./faq.md)。
