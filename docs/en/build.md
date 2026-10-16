@@ -38,13 +38,19 @@ python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 Linux (Ubuntu 24.04, X11 / Wayland):
 
 ```bash
-sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libwayland-dev
+sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
 cargo build --release --locked
 python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
 `APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` reads `src/config.py`. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The old `qtui.py`, `main.spec`, and `requirements.txt` remain for comparison.
+
+### Desktop packaging trial
+
+`Native desktop checks` (`.github/workflows/desktop-check.yml`) runs on desktop push/PR changes and supports **Run workflow** in Actions. Without tags or Android signing secrets it builds the selected branch's Windows exe, macOS universal2 DMG, and Linux amd64/arm64 debs. Four `desktop-package-*` artifacts contain the distributable, SHA256SUMS.txt, and commit/version metadata.
+
+It checks Windows product metadata, mounts the DMG to check both architectures, signature integrity and the Applications link, and installs each deb on a matching Ubuntu runner before an offline screenshot test. Linux tests need `libxkbcommon-x11-0`, also declared as a deb runtime dependency. macOS uses ad-hoc signing, without Developer ID or notarization. Trial builds do not create a Release.
 
 ### Automated release
 

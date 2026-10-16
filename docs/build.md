@@ -38,13 +38,19 @@ python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 Linux（Ubuntu 24.04，支持 X11 / Wayland）：
 
 ```bash
-sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libwayland-dev
+sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
 cargo build --release --locked
 python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
 `APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 读取 `src/config.py`。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 `qtui.py`、`main.spec` 和 `requirements.txt` 保留供迁移对照。
+
+### 桌面打包试运行
+
+`Native desktop checks`（`.github/workflows/desktop-check.yml`）在桌面代码 push / PR 时运行，也支持 Actions 页的 **Run workflow**。无需 tag 或安卓签名材料，构建当前分支的 Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb，并上传四份 `desktop-package-*` artifacts，每份包含安装文件、SHA256SUMS.txt 与提交/版本元数据。
+
+流程会校验 Windows 产品版本；挂载 DMG，检查双架构、应用签名完整性及 Applications 链接；在对应架构 Ubuntu runner 安装 deb 并运行离线截图测试。Linux 截图测试需要 `libxkbcommon-x11-0`；它同时被声明为 deb 运行依赖。macOS 为 ad-hoc 签名，不包含 Apple Developer ID 或公证。试运行不会创建 Release。
 
 ### 自动发布流水线
 

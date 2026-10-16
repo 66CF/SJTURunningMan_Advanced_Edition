@@ -1,5 +1,6 @@
 name: Native desktop checks
 on:
+  workflow_dispatch:
   push:
     paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'src/config.py', 'scripts/package_desktop.py', 'scripts/test_*.py', 'assets/Routes/default.txt', 'assets/SJTURM.*', 'route_planner.html', 'build_windows.ps1', '.github/workflows/desktop-check.yml']
   pull_request:
@@ -11,22 +12,69 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-24.04]
+        include:
+          - os: windows-latest
+            package: windows-x64
+          - os: macos-latest
+            package: macos-universal
+          - os: ubuntu-24.04
+            package: linux-amd64
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            package: linux-arm64
+            arch: arm64
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Read desktop version
+        shell: python
+        run: |
+          import os, runpy
+          version = runpy.run_path('src/config.py')['global_version'].removeprefix('v')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'APP_VERSION={version}\n')
       - name: Test packaging layouts
         run: python3 -m unittest discover -s scripts -p "test_*.py"
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libwayland-dev xvfb fonts-noto-cjk
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev xvfb fonts-noto-cjk
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --release --locked
+      - name: Build and verify Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./build_windows.ps1
+          Copy-Item dist/SJTURunningMan.exe "dist/SJTURunningMan_${env:APP_VERSION}_windows.exe"
+          $version = (Get-Item "dist/SJTURunningMan_${env:APP_VERSION}_windows.exe").VersionInfo.ProductVersion
+          if ($version -ne $env:APP_VERSION) { throw "Incorrect executable version: $version" }
+      - name: Build and verify universal macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          cargo build --release --locked --target x86_64-apple-darwin
+          cargo build --release --locked --target aarch64-apple-darwin
+          mkdir -p dist
+          lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
+          lipo -verify_arch x86_64 arm64 dist/SJTURunningMan
+          python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
+          hdiutil verify "dist/SJTURunningMan_${APP_VERSION}_macOS.dmg"
+          mount="$RUNNER_TEMP/desktop-dmg"
+          mkdir -p "$mount"
+          hdiutil attach "dist/SJTURunningMan_${APP_VERSION}_macOS.dmg" -readonly -nobrowse -mountpoint "$mount"
+          trap 'hdiutil detach "$mount"' EXIT
+          test "$(readlink "$mount/Applications")" = /Applications
+          cp -R "$mount/SJTURunningMan.app" "$RUNNER_TEMP/SJTURunningMan.app"
+          codesign --verify --deep --strict "$RUNNER_TEMP/SJTURunningMan.app"
+          lipo -verify_arch x86_64 arm64 "$RUNNER_TEMP/SJTURunningMan.app/Contents/MacOS/SJTURunningMan"
       - name: Smoke test on Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -37,8 +85,45 @@ jobs:
       - name: Smoke test on Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a target/release/sjturunningman --smoke-test target/smoke
+      - name: Package, install and smoke-test Linux deb
+        if: runner.os == 'Linux'
+        env:
+          PACKAGE_ARCH: ${{ matrix.arch }}
+        run: |
+          python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch "$PACKAGE_ARCH"
+          deb="dist/SJTURunningMan_${APP_VERSION}_linux_${PACKAGE_ARCH}.deb"
+          test "$(dpkg-deb --field "$deb" Architecture)" = "$PACKAGE_ARCH"
+          sudo apt-get install -y "./$deb"
+          dpkg-query --show sjturunningman
+          xvfb-run -a /usr/bin/sjturunningman --smoke-test target/installed-smoke
+      - name: Write artifact checksums and build metadata
+        shell: python
+        run: |
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('dist')
+          files = sorted(p for p in root.iterdir() if p.suffix in ['.exe', '.dmg', '.deb'] and p.name.startswith('SJTURunningMan_'))
+          assert len(files) == 1, f'Expected one distributable, found {files}'
+          (root / 'SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files), encoding='utf-8')
+          (root / 'build-info.json').write_text(json.dumps({'commit': os.environ['GITHUB_SHA'], 'version': os.environ['APP_VERSION'], 'run_id': os.environ['GITHUB_RUN_ID'], 'files': [p.name for p in files]}, indent=2), encoding='utf-8')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write('## Desktop package\n' + (root / 'SHA256SUMS.txt').read_text())
+      - name: Upload verified desktop package
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-package-${{ matrix.package }}
+          path: |
+            dist/SJTURunningMan_*.exe
+            dist/SJTURunningMan_*.dmg
+            dist/SJTURunningMan_*.deb
+            dist/SHA256SUMS.txt
+            dist/build-info.json
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: always() && runner.os != 'macOS'
         with:
-          name: desktop-smoke-${{ runner.os }}
-          path: target/smoke/*.png
+          name: desktop-smoke-${{ matrix.package }}
+          path: |
+            target/smoke/*.png
+            target/smoke/smoke-result.json
+            target/installed-smoke/smoke-result.json
