@@ -2,6 +2,11 @@ name: Release
 
 # 推 tag 触发，`4.5.0` 与 `v4.5.0` 两种写法都认；也可手动指定已有 tag 重跑。
 #
+# ⚠️ 只适用于桌面迁移后（v4.5.0 起）的 tag：构建作业 checkout 该 tag 的源码树，再调用
+#    迁移后的构建文件（`desktop/`、Rust 版 `build_windows.ps1`、`scripts/package_desktop.py`）。
+#    重跑迁移前的 tag 会直接失败。tag 必须与 `desktop/Cargo.toml` 的 version 一致，
+#    meta 作业会断言这一点。
+#
 # 正确顺序：
 #   推 tag  ->  本工作流构建  ->  生成 draft release 并挂上 5 个产物
 #          ->  人工审核  ->  点发布
@@ -51,6 +56,20 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ver.outputs.tag }}
+          fetch-depth: 1
+      - name: 校验 tag 与 desktop/Cargo.toml 版本一致
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          manifest=$(sed -n 's/^version = "\(.*\)"/\1/p' desktop/Cargo.toml | head -1)
+          if [ "$manifest" != "$VERSION" ]; then
+            echo "::error::desktop/Cargo.toml 的 version ($manifest) 与 tag ($VERSION) 不一致，请先统一版本号"
+            exit 1
+          fi
+          echo "desktop 版本 $manifest 与 tag 一致"
 
   build-windows:
     needs: meta

@@ -2,9 +2,12 @@ name: Native desktop checks
 on:
   workflow_dispatch:
   push:
-    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'src/config.py', 'scripts/package_desktop.py', 'scripts/test_*.py', 'assets/Routes/default.txt', 'assets/SJTURM.*', 'route_planner.html', 'build_windows.ps1', '.github/workflows/desktop-check.yml']
+    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/Routes/default.txt', 'assets/SJTURM.*', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml']
   pull_request:
-    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'src/config.py', 'scripts/package_desktop.py', 'scripts/test_*.py', 'assets/Routes/default.txt', 'assets/SJTURM.*', 'route_planner.html', 'build_windows.ps1', '.github/workflows/desktop-check.yml']
+    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/Routes/default.txt', 'assets/SJTURM.*', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml']
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -35,10 +38,12 @@ jobs:
       - name: Read desktop version
         shell: python
         run: |
-          import os, runpy
-          version = runpy.run_path('src/config.py')['global_version'].removeprefix('v')
-          with open(os.environ['GITHUB_ENV'], 'a') as output:
-              output.write(f'APP_VERSION={version}\n')
+          import os, re, pathlib
+          manifest = pathlib.Path('desktop/Cargo.toml').read_text(encoding='utf-8')
+          match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', manifest)
+          assert match, 'desktop/Cargo.toml is missing package.version'
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f'APP_VERSION={match.group(1)}\n')
       - name: Test packaging layouts
         run: python3 -m unittest discover -s scripts -p "test_*.py"
       - name: Install Linux dependencies
@@ -76,6 +81,23 @@ jobs:
           cp -R "$mount/SJTURunningMan.app" "$RUNNER_TEMP/SJTURunningMan.app"
           codesign --verify --deep --strict "$RUNNER_TEMP/SJTURunningMan.app"
           lipo "$RUNNER_TEMP/SJTURunningMan.app/Contents/MacOS/SJTURunningMan" -verify_arch x86_64 arm64
+
+      - name: Smoke test the packaged macOS app
+        if: runner.os == 'macOS'
+        run: |
+          app="$RUNNER_TEMP/SJTURunningMan.app/Contents/MacOS/SJTURunningMan"
+          mkdir -p target/macos-smoke
+          "$app" --smoke-test target/macos-smoke &
+          pid=$!
+          for _ in $(seq 120); do
+            [ -f target/macos-smoke/smoke-result.json ] && break
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          test -f target/macos-smoke/smoke-result.json
+
       - name: Smoke test on Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -85,7 +107,10 @@ jobs:
           if (-not (Test-Path target/smoke/smoke-result.json)) { throw 'Missing smoke test result' }
       - name: Smoke test on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a target/release/sjturunningman --smoke-test target/smoke
+        run: |
+          xvfb-run -a target/release/sjturunningman --smoke-test target/smoke
+          test -f target/smoke/smoke-result.json
+
       - name: Package, install and smoke-test Linux deb
         if: runner.os == 'Linux'
         env:
@@ -97,6 +122,22 @@ jobs:
           sudo apt-get install -y "./$deb"
           dpkg-query --show sjturunningman
           xvfb-run -a /usr/bin/sjturunningman --smoke-test target/installed-smoke
+          test -f target/installed-smoke/smoke-result.json
+
+      - name: Verify deb dependencies on a clean image
+        # runner 自身带着 X11 / 字体栈，装得上不代表 Depends 写对了，这里用干净镜像验一遍。
+        if: runner.os == 'Linux' && matrix.arch == 'amd64'
+        env:
+          PACKAGE_ARCH: ${{ matrix.arch }}
+        run: |
+          deb="$(pwd)/dist/SJTURunningMan_${APP_VERSION}_linux_${PACKAGE_ARCH}.deb"
+          docker run --rm -v "$deb:/tmp/app.deb:ro" ubuntu:24.04 bash -c '
+            set -e
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq /tmp/app.deb
+            dpkg-query --show sjturunningman
+          '
       - name: Write artifact checksums and build metadata
         shell: python
         run: |
@@ -121,10 +162,12 @@ jobs:
             dist/build-info.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
-        if: always() && runner.os != 'macOS'
+        if: always()
         with:
           name: desktop-smoke-${{ matrix.package }}
           path: |
             target/smoke/*.png
             target/smoke/smoke-result.json
             target/installed-smoke/smoke-result.json
+            target/macos-smoke/*.png
+            target/macos-smoke/smoke-result.json
