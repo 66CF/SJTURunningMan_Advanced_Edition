@@ -38,9 +38,9 @@
 ```
 SJTURunningMan_Advanced_Edition/
 ├── desktop/                Rust + Slint 电脑版（src/ 与 ui/）
-├── Cargo.toml              桌面 Cargo workspace
+├── Cargo.toml              桌面 Cargo workspace（版本号在 desktop/Cargo.toml）
 ├── qtui.py                 旧 Qt GUI 入口（迁移对照）
-├── src/                    旧 Python 模块；config.py 保留桌面版本号
+├── src/                    旧 Python 模块；config.py 只对应旧客户端版本号
 ├── utils/                  通用工具
 ├── assets/                 图标、背景、内置路线（assets/Routes/）
 ├── main.spec               旧 PyInstaller 配置（迁移对照）

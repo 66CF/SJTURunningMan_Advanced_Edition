@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from package_desktop import package
+from package_desktop import cargo_version, package
 
 
 class PackagingTest(unittest.TestCase):
@@ -50,6 +50,21 @@ class PackagingTest(unittest.TestCase):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 package("linux", self.binary, self.root / "output", version, "amd64")
         self.assertFalse((self.root / "output").exists())
+
+    def test_version_defaults_to_the_cargo_manifest(self):
+        self.assertRegex(cargo_version(), r"^\d+\.\d+\.\d+")
+
+    @patch("package_desktop.subprocess.run")
+    def test_linux_rejects_binary_arch_mismatch(self, run):
+        elf = bytearray(64)
+        elf[0:4] = b"\x7fELF"
+        elf[18:20] = (0x3E).to_bytes(2, "little")  # x86-64
+        self.binary.write_bytes(bytes(elf))
+        package("linux", self.binary, self.root / "matching", "4.5.0", "amd64")
+        self.assertTrue((self.root / "matching/deb-amd64/usr/bin/sjturunningman").exists())
+        with self.assertRaises(ValueError):
+            package("linux", self.binary, self.root / "mismatch", "4.5.0", "arm64")
+        self.assertFalse((self.root / "mismatch/deb-arm64").exists())
 
 
 if __name__ == "__main__":

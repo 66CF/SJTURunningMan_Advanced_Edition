@@ -38,9 +38,9 @@ This directory is the English mirror of the project documentation. The root [REA
 ```
 SJTURunningMan_Advanced_Edition/
 ├── desktop/                Rust + Slint desktop (src/ and ui/)
-├── Cargo.toml              Desktop Cargo workspace
+├── Cargo.toml              Desktop Cargo workspace (version lives in desktop/Cargo.toml)
 ├── qtui.py                 Legacy Qt GUI reference
-├── src/                    Legacy Python modules; config.py supplies desktop version
+├── src/                    Legacy Python modules; config.py only versions the legacy client
 ├── utils/                  Shared helpers
 ├── assets/                 Icons, backgrounds, built-in routes (assets/Routes/)
 ├── main.spec               Legacy PyInstaller config (migration reference)

@@ -10,6 +10,28 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
+ELF_MACHINES = {"amd64": 0x3E, "arm64": 0xB7}
+
+
+def cargo_version():
+    """桌面版本号的唯一来源是 desktop/Cargo.toml 的 package.version。"""
+    manifest = (ROOT / "desktop" / "Cargo.toml").read_text(encoding="utf-8")
+    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', manifest)
+    if not match:
+        raise ValueError("desktop/Cargo.toml is missing package.version")
+    return match.group(1)
+
+
+def check_binary_arch(binary, arch):
+    """deb 的 Architecture 由 --arch 决定，这里核对输入 ELF 的 machine 是否一致。"""
+    header = binary.read_bytes()[:20]
+    if header[:4] != b"\x7fELF":
+        return  # 非 ELF（如 macOS Mach-O）不在这里判断
+    if len(header) < 20:
+        raise ValueError("Truncated ELF header")
+    if int.from_bytes(header[18:20], "little") != ELF_MACHINES[arch]:
+        raise ValueError(f"Binary architecture does not match --arch {arch}")
+
 
 def package(platform, binary, output, version, arch):
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?", version):
@@ -43,6 +65,7 @@ def package(platform, binary, output, version, arch):
         subprocess.run(["hdiutil", "create", "-volname", f"SJTURunningMan {version}", "-srcfolder", str(stage),
                         "-ov", "-format", "UDZO", str(output / f"SJTURunningMan_{version}_macOS.dmg")], check=True)
     else:
+        check_binary_arch(binary, arch)
         stage = output / f"deb-{arch}"
         if stage.exists():
             raise FileExistsError("Use a fresh output directory for packaging")
@@ -61,7 +84,10 @@ def package(platform, binary, output, version, arch):
             "libxcb-shm0, libxkbcommon0, libxkbcommon-x11-0, libxrandr2, libxi6, libxcursor1, "
             "libwayland-client0, libfontconfig1\nRecommends: xdg-desktop-portal, fonts-noto-cjk\n"
             "Homepage: https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition\n"
-            "Description: SJTU RunningMan native Rust and Slint desktop client\n", encoding="utf-8")
+            "Description: SJTU RunningMan native Rust and Slint desktop client\n"
+            " Built on Ubuntu 24.04 (glibc 2.39); newer distributions are backwards compatible.\n",
+            encoding="utf-8",
+        )
         subprocess.run(["dpkg-deb", "--build", "--root-owner-group", str(stage),
                         str(output / f"SJTURunningMan_{version}_linux_{arch}.deb")], check=True)
 
@@ -72,6 +98,6 @@ if __name__ == "__main__":
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
     parser.add_argument("--arch", choices=["amd64", "arm64"], default="amd64")
-    parser.add_argument("--version", default=os.environ.get("APP_VERSION", "4.5.0"))
+    parser.add_argument("--version", default=os.environ.get("APP_VERSION") or cargo_version())
     args = parser.parse_args()
     package(args.platform, args.binary, args.output, args.version, args.arch)

@@ -10,15 +10,15 @@ SJTU 一键校园跑工具 —— 用于研究运动数据记录与上传流程�
 
 ```
 desktop/               Rust + Slint 电脑版（src/main.rs 入口、ui/app.slint 界面）
-Cargo.toml             桌面 Cargo workspace；Cargo.lock 固定依赖
+Cargo.toml             桌面 Cargo workspace；Cargo.lock 固定依赖；版本号在 desktop/Cargo.toml
 scripts/package_desktop.py  macOS app/dmg 与 Linux deb 打包
 qtui.py                旧 Qt 入口，保留作迁移对照
-src/                   旧 Python 业务模块；config.py 仍提供桌面版本号
+src/                   旧 Python 业务模块；config.py 的 global_version 只对应旧客户端
   api_client.py        上传 / 认证 HTTP（含伪装 UA）
   data_generator.py    轨迹生成 + 内嵌路线规划器 HTML
   login.py             登录与验证码
   route_preview.py     本地预览生成
-  config.py            全局版本号 global_version
+  config.py            旧客户端版本号 global_version（新桌面版看 desktop/Cargo.toml）
   update_checker.py    更新检查
   info_dialog.py       说明弹窗（import assets.resources_rc）
 utils/auxiliary_util.py
@@ -36,7 +36,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 ## 改动边界（重要）
 
 1. **四个平台业务互不引用。** Rust 桌面代码不引用 `apps/`；`release.yml` 分别构建桌面与安卓。改一个平台不要顺手改另一个。
-2. **`src/config.py` 的 `global_version` 只代表电脑版**，与移动端版本号无关。各平台版本号位置见 [CONTRIBUTING.md](CONTRIBUTING.md#版本号)。
+2. **版本号**：新桌面版看 `desktop/Cargo.toml` 的 `version`（`desktop/build.rs` 读取，release.yml 会断言与 tag 一致）；`src/config.py` 的 `global_version` 只对应保留的旧 Qt 客户端。都与移动端版本号无关。位置见 [CONTRIBUTING.md](CONTRIBUTING.md#版本号)。
 3. **`assets/resources_rc.py` 是真实依赖**，不是可删的构建产物 —— `src/info_dialog.py` 直接 import 它，`main.spec` 也把它列进 hiddenimports。没有对应的 `.qrc` 源文件，这个生成文件就是唯一来源。
 4. **`assets/Routes/NeedsReview/` 是隔离区。** 里面的路线有跳段 / 长度 / 起终点问题，不要直接把它们加回内置列表。
 5. **路线坐标系**：路线文件存 BD09，OSM 瓦片是 WGS84，上传前由客户端转 GCJ02。见 [docs/routes.md](docs/routes.md)。
@@ -78,7 +78,7 @@ cd apps/harmonyos && hvigorw assembleHap
 
 ## 测试现状
 
-Rust 电脑版有单元测试、本地 HTTP mock 和 `--smoke-test` 截图验收。`desktop-check.yml` 在三个系统运行检查，桌面 release 作业先测试再打包。安卓保留既有单元及仪器测试。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
+Rust 电脑版有单元测试、本地 HTTP mock 和 `--smoke-test` 截图验收。`desktop-check.yml` 在三个系统运行检查，桌面 release 作业先测试再打包。安卓保留既有单元及仪器测试。旧 Qt / Python 客户端仍由 `ci-python.yml` 做语法与导入检查，但发布产物已不再包含它 —— 退役前不要在这套旧代码上投入新功能。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
 
 ## 修改约定
 
