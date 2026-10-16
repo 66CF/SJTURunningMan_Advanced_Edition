@@ -109,7 +109,7 @@ jobs:
           cargo build --release --locked --target aarch64-apple-darwin
           mkdir -p dist
           lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
-          lipo -verify_arch x86_64 arm64 dist/SJTURunningMan
+          lipo dist/SJTURunningMan -verify_arch x86_64 arm64
           python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
       - name: 生成来源证明
         uses: actions/attest-build-provenance@v4
