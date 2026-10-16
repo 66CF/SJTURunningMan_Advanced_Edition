@@ -42,12 +42,37 @@ struct PreparedLogin {
     captcha: Result<String, String>,
 }
 
+type PreviewInputs = (String, String, String, String);
+
+fn preview_inputs(ui: &AppWindow) -> PreviewInputs {
+    (
+        ui.get_runs().into(),
+        ui.get_distance().into(),
+        ui.get_run_date().into(),
+        ui.get_run_time().into(),
+    )
+}
+
+/// 参数改过之后旧预览不再对应当前设置，此时按「没有预览」处理，避免地图和摘要
+/// 显示上一条参数的轨迹。
+fn fresh_preview(ui: &AppWindow, state: &mut State) -> Option<Preview> {
+    if state.preview_inputs.as_ref() == Some(&preview_inputs(ui)) {
+        state.preview.clone()
+    } else {
+        state.preview = None;
+        state.preview_inputs = None;
+        None
+    }
+}
+
 struct State {
     dir: PathBuf,
     maps: Option<MapServer>,
     map_output: Option<PathBuf>,
     routes: Vec<Route>,
     preview: Option<Preview>,
+    /// 生成 preview 时的参数（次数、距离、日期、时间），用于判断预览是否已过期。
+    preview_inputs: Option<PreviewInputs>,
     session: Option<Session>,
     challenge: Option<LoginChallenge>,
     two_factor: Option<Session>,
@@ -108,6 +133,7 @@ fn selected(state: &State, ui: &AppWindow) -> Result<Route, String> {
 
 fn refresh_route(ui: &AppWindow, state: &mut State) {
     state.preview = None;
+    state.preview_inputs = None;
     if let Ok(route) = selected(state, ui) {
         ui.set_route_image(preview::render(&route.points, ui.get_dark()));
         ui.set_route_title(route.name.into());
@@ -143,10 +169,15 @@ fn show_preview(ui: &AppWindow, state: &mut State, data: Preview) {
         .into(),
     );
     state.preview = Some(data);
+    state.preview_inputs = Some(preview_inputs(ui));
 }
 
 fn reload_routes(ui: &AppWindow, state: &mut State, name: &str) -> Result<(), String> {
-    state.routes = route::list(&state.dir)?;
+    let (routes, skipped) = route::list(&state.dir)?;
+    state.routes = routes;
+    for problem in skipped {
+        log(ui, &format!("跳过无法解析的路线：{problem}"));
+    }
     ui.set_route_names(ModelRc::new(VecModel::from(
         state
             .routes
@@ -182,7 +213,27 @@ fn open_map_page(state: &mut State, name: &str, html: String) -> Result<(), Stri
     }
 }
 
+/// Release 使用 `panic = "abort"` 且 Windows 走 GUI 子系统，`eprintln!` 不会显示在
+/// 任何地方；把 panic 落到用户数据目录，至少留下可排查的线索。
+fn install_panic_log() {
+    let path = settings::data_dir()
+        .map(|dir| dir.join("crash.log"))
+        .unwrap_or_else(|_| std::env::temp_dir().join("sjturunningman-crash.log"));
+    std::panic::set_hook(Box::new(move |info| {
+        if let Ok(previous) = std::fs::read_to_string(&path) {
+            // 只保留最近几次崩溃，避免无限增长。
+            let kept: Vec<_> = previous.lines().rev().take(100).collect();
+            let text = kept.into_iter().rev().collect::<Vec<_>>().join("\n");
+            let _ = std::fs::write(&path, format!("{text}\n{info}\n"));
+        } else if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+            let _ = std::fs::write(&path, format!("{info}\n"));
+        }
+    }));
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    install_panic_log();
     let started = Instant::now();
     let args: Vec<_> = std::env::args_os().collect();
     let login_smoke = args.get(1).is_some_and(|s| s == "--login-smoke-test");
@@ -202,7 +253,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(p) => (p, None),
         Err(e) => (Settings::default(), Some(e)),
     };
-    let preserve_settings = warning.is_some();
+    // 坏文件已被备份成 settings.json.bak 时 path 不再存在，此时照常保存；
+    // 只有备份也失败（原文件仍在）才跳过保存，避免覆盖用户数据。
+    let preserve_settings = warning.is_some() && dir.join("settings.json").exists();
     let ui = AppWindow::new()?;
     ui.set_ui_font(
         if cfg!(target_os = "windows") {
@@ -226,6 +279,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         map_output: if map_smoke { smoke_dir.clone() } else { None },
         routes: Vec::new(),
         preview: None,
+        preview_inputs: None,
         session: None,
         challenge: None,
         two_factor: None,
@@ -370,6 +424,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         stopped,
                     } => {
                         ui.set_busy(false);
+                        // 结束或停止后不要停在中间值，否则进度条看起来像卡住了。
+                        ui.set_progress(if stopped { 0 } else { 100 });
                         ui.set_status(
                             format!(
                                 "{} · 成功 {success} 条，失败 {failed} 条",
@@ -389,6 +445,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 AppEvent::TaskError(error) => {
                     ui.set_busy(false);
+                    ui.set_progress(0);
                     ui.set_status("任务失败".into());
                     notify(&ui, error);
                     if state.close_after_stop {
@@ -411,7 +468,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.on_refresh_preview(move || {
         if let Some(ui) = weak.upgrade() {
             let mut state = shared.borrow_mut();
-            if let Some(data) = state.preview.clone() {
+            if let Some(data) = fresh_preview(&ui, &mut state) {
                 show_preview(&ui, &mut state, data);
             } else {
                 refresh_route(&ui, &mut state);
@@ -494,11 +551,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let result = (|| {
             let mut state = shared.borrow_mut();
             let route = selected(&state, &ui)?;
-            let points = state
-                .preview
-                .as_ref()
-                .map(|p| p.points.clone())
-                .unwrap_or_else(|| route::corrected(&route.points));
+            let had_preview = state.preview.is_some();
+            let points = match fresh_preview(&ui, &mut state) {
+                Some(data) => data.points,
+                None => {
+                    if had_preview {
+                        notify(
+                            &ui,
+                            "参数已变更，地图先显示原始路线；重新点击「预览实际轨迹」查看新轨迹",
+                        );
+                    }
+                    route::corrected(&route.points)
+                }
+            };
             let html = route::preview_html(&points, &route.name);
             open_map_page(&mut state, "preview", html)
         })();

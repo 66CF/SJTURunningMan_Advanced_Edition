@@ -38,8 +38,21 @@ pub fn load(dir: &Path) -> Result<Settings, String> {
     if !path.exists() {
         return Ok(Settings::default());
     }
-    serde_json::from_slice(&fs::read(path).map_err(|_| "无法读取偏好设置")?)
-        .map_err(|_| "偏好设置损坏，已使用默认设置；原文件保留".into())
+    let bytes = fs::read(&path).map_err(|_| "无法读取偏好设置")?;
+    match serde_json::from_slice(&bytes) {
+        Ok(settings) => Ok(settings),
+        Err(_) => {
+            // 备份坏文件，之后照常保存，否则用户后续的改动永远不会落盘。
+            let backup = dir.join("settings.json.bak");
+            let _ = fs::remove_file(&backup);
+            match fs::rename(&path, &backup) {
+                Ok(()) => {
+                    Err("偏好设置损坏，已使用默认设置；原文件备份为 settings.json.bak".into())
+                }
+                Err(_) => Err("偏好设置损坏，已使用默认设置；原文件保留".into()),
+            }
+        }
+    }
 }
 
 pub fn save(dir: &Path, settings: &Settings) -> Result<(), String> {
@@ -145,9 +158,13 @@ mod tests {
         assert_eq!(saved.route, "my-route");
         std::fs::write(dir.path().join("settings.json"), "broken").unwrap();
         assert!(load(dir.path()).is_err());
+        assert!(!dir.path().join("settings.json").exists());
         assert_eq!(
-            std::fs::read_to_string(dir.path().join("settings.json")).unwrap(),
+            std::fs::read_to_string(dir.path().join("settings.json.bak")).unwrap(),
             "broken"
         );
+        // 备份后必须能继续保存，否则用户的后续改动会一直丢失。
+        save(dir.path(), &Settings::default()).unwrap();
+        assert!(!load(dir.path()).unwrap().dark);
     }
 }

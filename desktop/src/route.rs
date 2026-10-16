@@ -58,12 +58,16 @@ pub fn read(path: &Path) -> Result<Vec<Point>, String> {
     parse(&fs::read_to_string(path).map_err(|_| "路线必须是 UTF-8 文本")?)
 }
 
-pub fn list(dir: &Path) -> Result<Vec<Route>, String> {
+/// 返回可用路线，以及被跳过的文件说明。
+///
+/// 单个损坏的 txt 不能让整个列表消失 —— 那会让用户在启动时丢掉所有导入路线。
+pub fn list(dir: &Path) -> Result<(Vec<Route>, Vec<String>), String> {
     let mut routes = vec![Route {
         name: "default".into(),
         path: None,
         points: parse(DEFAULT_ROUTE)?,
     }];
+    let mut skipped = Vec::new();
     let path = dir.join("routes");
     if path.exists() {
         let mut files: Vec<_> = fs::read_dir(path)
@@ -77,25 +81,23 @@ pub fn list(dir: &Path) -> Result<Vec<Route>, String> {
                 .extension()
                 .is_some_and(|e| e.eq_ignore_ascii_case("txt"))
             {
-                let points = read(&path).map_err(|e| {
-                    format!(
-                        "{}：{e}",
-                        path.file_name().unwrap_or_default().to_string_lossy()
-                    )
-                })?;
-                routes.push(Route {
-                    name: path
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .into(),
-                    path: Some(path),
-                    points,
-                });
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                match read(&path) {
+                    Ok(points) => routes.push(Route {
+                        name: path
+                            .file_stem()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .into(),
+                        path: Some(path),
+                        points,
+                    }),
+                    Err(error) => skipped.push(format!("{name}：{error}")),
+                }
             }
         }
     }
-    Ok(routes)
+    Ok((routes, skipped))
 }
 
 pub fn import(dir: &Path, source: &Path) -> Result<String, String> {
@@ -298,7 +300,8 @@ mod tests {
         fs::write(&source, DEFAULT_ROUTE).unwrap();
         assert_eq!(import(dir.path(), &source).unwrap(), "default_1");
         assert_eq!(import(dir.path(), &source).unwrap(), "default_2");
-        let routes = list(dir.path()).unwrap();
+        let (routes, skipped) = list(dir.path()).unwrap();
+        assert!(skipped.is_empty());
         assert_eq!(routes.len(), 3);
         assert!(delete(dir.path(), &routes[0]).is_err());
         let outside = Route {
@@ -308,8 +311,24 @@ mod tests {
         };
         assert!(delete(dir.path(), &outside).is_err());
         delete(dir.path(), &routes[1]).unwrap();
-        assert_eq!(list(dir.path()).unwrap().len(), 2);
+        assert_eq!(list(dir.path()).unwrap().0.len(), 2);
         assert!(source.exists());
+    }
+
+    #[test]
+    fn one_broken_route_file_does_not_hide_the_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let routes_dir = dir.path().join("routes");
+        fs::create_dir_all(&routes_dir).unwrap();
+        fs::write(routes_dir.join("good.txt"), DEFAULT_ROUTE).unwrap();
+        fs::write(routes_dir.join("broken.txt"), "not a route").unwrap();
+        let (routes, skipped) = list(dir.path()).unwrap();
+        assert_eq!(
+            routes.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            ["default", "good"]
+        );
+        assert_eq!(skipped.len(), 1);
+        assert!(skipped[0].starts_with("broken.txt："));
     }
 
     #[test]
