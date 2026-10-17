@@ -69,6 +69,7 @@ For online maps, run `--map-smoke-test target/map-smoke`. Production UI callback
 - [ ] Updates are checked on demand; network failures are reported.
 - [ ] Windows exe has the expected icon/version, works away from assets, and requires no Python/Qt/MSYS2 DLLs.
 - [ ] macOS Intel/ARM targets combine into a universal app; DMG contains app and Applications link; validate on both architectures.
+- [ ] Chinese text is fully visible on macOS (navigation, form labels, log, full consent text), not just digits and Latin letters -- a failed font registration blanks all CJK, see [validation record](desktop-validation.md).
 - [ ] Linux amd64/arm64 debs install on matching Ubuntu 24.04 hosts; validate X11, Wayland, and file picker.
 
 Windows checks do not replace macOS/Linux validation. Offline/local HTTP mock tests cannot establish live authentication, two-factor, or upload success.

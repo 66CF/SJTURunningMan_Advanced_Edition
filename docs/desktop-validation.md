@@ -69,3 +69,13 @@
 共享表单与下拉选择器统一为 38 px / 1 px 柔和边框 / 8 px 圆角，工具栏 34 px、次级按钮 36 px；清空日志为自适应宽度的 32 px 按钮。日志说明移到卡片标题下方，正文左上对齐，空日志显示占位。计划卡片按内容高度排列，底部提示与操作固定间距。
 
 任务栏仅在工作台常驻，进度轨道为 6 px 并从左端填充；其他页面仅在运行中显示紧凑状态与停止按钮。长通知随文字换行调整高度。Release 的 28 张截图由实际软件渲染生成，人工检查了上述页面矩阵、长文本与弹窗；仅使用离线状态，不调用账号登录或上传。截图与 smoke 断言保存在本地忽略目录 `target/ui-modernization/release/`。macOS / Linux 视觉表现仍待真机验证。
+
+## macOS 中文渲染修复
+
+新增的 macOS 运行验收（`desktop-check.yml` 在打包后实跑 `--smoke-test`，见下节）第一次拿到 macOS 上的实际截图，发现**界面里所有汉字都不渲染**：同一版本的 Windows / Linux 截图正常，macOS 只剩数字和拉丁字母 —— 例如「跑步次数 / 次」只剩「 / 」，「单次距离 / km」只剩「 / km」，承诺书弹窗标题与 4 条正文全空白、只剩序号 `1.`–`4.`，而 `RunningMan`、`v4.5.0`、`BD09` 这类拉丁文字正常。
+
+像素检查显示汉字的推进宽度为 0（斜杠紧贴标签左端），即所选字体根本没有这些字形，系统 fallback 也没有补上：界面字体此前只按**名字**指定（macOS 为 `PingFang SC`），该名字在无人会话环境里解析不到，Slint 便退回一个只含拉丁字形的字体。
+
+修法：启动时按「家族名 + 系统字体文件路径」候选列表读取字体文件，用 `slint::fontique_07::shared_collection()` 注册进 Slint 自己的字体库，把第一个注册成功的家族设为界面字体，并追加为汉字（`Hani`）的 fallback。候选：macOS `PingFang.ttc` / `Hiragino Sans GB.ttc` / `STHeiti Medium.ttc` / `Arial Unicode.ttf`，Windows `msyh.ttc` / `simhei.ttf`，Linux Noto Sans CJK / WenQuanYi Zen Hei；全部不可用时回退到原来的系统字体名。注册与 fallback 结果写进 `smoke-result.json` 的 `ui_font` 与 `font_candidates`，便于排查同类问题。该改动同时消除了对系统字体枚举行为的依赖，Windows / Linux 未发现视觉回归。
+
+`slint` 因此启用了 `unstable-fontique-07`（Slint 官方提供的运行时字体注册接口，见 `fontique_07` 模块文档）。真机 macOS 仍需人工确认一次中文显示。

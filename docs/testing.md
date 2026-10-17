@@ -71,6 +71,7 @@ cd apps/android
 - [ ] 更新检查只在点击时发起，弱网或超时给出清晰信息。
 - [ ] Windows exe 的图标和版本正确，可移到无 assets 的目录运行；不依赖 Python / Qt / MSYS2 DLL。
 - [ ] macOS 两个架构构建后由 lipo 合并；DMG 内有 app 和 Applications 链接，分别在 Intel / Apple Silicon 验收。
+- [ ] macOS 上界面中文完整可见（导航、表单标签、日志、承诺书全文），不只显示数字与拉丁字母 —— 字体注册失败时会出现整段中文空白，见 [验证记录](desktop-validation.md)。
 - [ ] Linux amd64 / arm64 deb 在 Ubuntu 24.04 对应架构安装，分别验证 X11 / Wayland 和文件选择器。
 
 本机 Windows 验证不能替代 macOS / Linux 真机验证；离线与本地 HTTP mock 测试不能证明真实认证、二次验证与上传已端到端通过。
