@@ -78,7 +78,13 @@
 
 修法：启动时按「家族名 + 系统字体文件路径」候选列表读取字体文件，用 `slint::fontique_07::shared_collection()` 注册进 Slint 自己的字体库，把第一个注册成功的家族设为界面字体，并追加为汉字（`Hani`）的 fallback。候选：macOS `PingFang.ttc` / `Hiragino Sans GB.ttc` / `STHeiti Medium.ttc` / `Arial Unicode.ttf`，Windows `msyh.ttc` / `simhei.ttf`，Linux Noto Sans CJK / WenQuanYi Zen Hei；全部不可用时回退到原来的系统字体名。注册与 fallback 结果写进 `smoke-result.json` 的 `ui_font` 与 `font_candidates`，便于排查同类问题。该改动同时消除了对系统字体枚举行为的依赖，Windows / Linux 未发现视觉回归。
 
-`slint` 因此启用了 `unstable-fontique-07`（Slint 官方提供的运行时字体注册接口，见 `fontique_07` 模块文档）。真机 macOS 仍需人工确认一次中文显示。
+当时 `slint` 因此启用了 `unstable-fontique-07`（Slint 官方提供的运行时字体注册接口，见 `fontique_07` 模块文档）。真机 macOS 仍需人工确认一次中文显示。
+
+## macOS 标题栏修复（2026-10-17）
+
+项目原先锁定 Slint 1.15.1。该版本在 macOS 上可能使原生标题栏（包括红绿灯区域）保持空白或透明；界面文件中的不透明窗口背景不能修复系统标题栏本身。桌面版已升级到 Slint 1.18.0，并将字体注册接口同步为 `unstable-fontique-011` / `fontique_011`。Slint 1.18.0 的 macOS 修复覆盖原生标题栏的透明判定，见 [Slint 1.18.0 release notes](https://github.com/slint-ui/slint/blob/v1.18.0/CHANGELOG.md)。
+
+本次已用临时 Rust 1.99.1 工具链完成 `cargo check --workspace --locked` 与 `cargo test --workspace --locked`：28 项测试通过，1 项真实验证码测试忽略；macOS 字体测试因 winit 要求测试运行在主线程而忽略。尚未启动 macOS Release 窗口，因此红绿灯区域仍需在实际应用窗口中人工验收。
 
 ## 百度 / OpenStreetMap 双引擎（2026-10-17）
 

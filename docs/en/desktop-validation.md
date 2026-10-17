@@ -78,7 +78,13 @@ Pixel inspection shows a zero advance width for the Han characters (the slash si
 
 Fix: at startup, walk a candidate list of "family name + system font file path", read the file, register it with `slint::fontique_07::shared_collection()` into Slint's own font collection, use the first family that registers as the UI font, and append it as a fallback for the Han script (`Hani`). Candidates: macOS `PingFang.ttc` / `Hiragino Sans GB.ttc` / `STHeiti Medium.ttc` / `Arial Unicode.ttf`, Windows `msyh.ttc` / `simhei.ttf`, Linux Noto Sans CJK / WenQuanYi Zen Hei; if none is usable the previous system family name is kept. Registration and fallback results are written to `smoke-result.json` as `ui_font` and `font_candidates`. This also removes the dependency on system font enumeration behaviour; no visual regression was found on Windows/Linux.
 
-`slint` therefore enables `unstable-fontique-07` (Slint's official runtime font registration interface, see the `fontique_07` module docs). macOS still needs one manual confirmation of Chinese text on real hardware.
+At that time, `slint` therefore enabled `unstable-fontique-07` (Slint's official runtime font registration interface; see the `fontique_07` module docs). macOS still needed one manual confirmation of Chinese text on real hardware.
+
+## macOS title-bar repair (2026-10-17)
+
+The project previously pinned Slint 1.15.1. On macOS, that version could leave the native title bar, including the traffic-light area, blank or transparent; the opaque background in the Slint window cannot repair the system title bar itself. The desktop client now uses Slint 1.18.0 and updates the font-registration API to `unstable-fontique-011` / `fontique_011`. Slint 1.18.0 includes the macOS fix for native-title-bar transparency handling; see the [Slint 1.18.0 release notes](https://github.com/slint-ui/slint/blob/v1.18.0/CHANGELOG.md).
+
+This change was checked with a temporary Rust 1.99.1 toolchain using `cargo check --workspace --locked` and `cargo test --workspace --locked`: 28 tests passed and one live CAPTCHA test was ignored; the macOS font test was ignored because winit requires the test to run on the main thread. A macOS Release window was not launched, so the traffic-light area still needs manual inspection in the actual application window.
 
 ## Baidu / OpenStreetMap dual engine (2026-10-17)
 
