@@ -88,6 +88,100 @@ fn dispatch(sender: &mpsc::Sender<AppEvent>, ui: &slint::Weak<AppWindow>, event:
     }
 }
 
+/// 系统里可能带 CJK 字形的字体文件，(家族名, 路径)，按优先级排列。
+fn cjk_font_candidates() -> &'static [(&'static str, &'static str)] {
+    if cfg!(target_os = "windows") {
+        &[
+            ("Microsoft YaHei UI", r"C:\Windows\Fonts\msyh.ttc"),
+            ("SimHei", r"C:\Windows\Fonts\simhei.ttf"),
+        ]
+    } else if cfg!(target_os = "macos") {
+        &[
+            ("PingFang SC", "/System/Library/Fonts/PingFang.ttc"),
+            (
+                "Hiragino Sans GB",
+                "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            ),
+            ("Heiti SC", "/System/Library/Fonts/STHeiti Medium.ttc"),
+            ("Arial Unicode MS", "/Library/Fonts/Arial Unicode.ttf"),
+        ]
+    } else {
+        &[
+            (
+                "Noto Sans CJK SC",
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            ),
+            (
+                "Noto Sans CJK SC",
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            ),
+            (
+                "WenQuanYi Zen Hei",
+                "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+            ),
+        ]
+    }
+}
+
+/// 选界面字体：先把系统里的 CJK 字体文件注册进 Slint 自己的字体库，再把它选为默认
+/// 家族，并追加为汉字（Hani）的 fallback。
+///
+/// 只写系统字体名是不够的：macOS 上 `"PingFang SC"` 在部分环境（如 CI 的无人会话）
+/// 解析不到，界面里中文会整段不渲染、只剩数字和拉丁字母。注册文件后家族一定存在，
+/// 汉字也不依赖系统字体枚举。
+///
+/// 返回 (界面字体家族, 诊断信息)，诊断信息会写进 `--smoke-test` 的报告便于排查。
+fn install_ui_font() -> (String, Vec<String>) {
+    use slint::fontique_07::{fontique, shared_collection};
+    let mut report = Vec::new();
+    let mut chosen: Option<String> = None;
+    for (family, path) in cjk_font_candidates() {
+        let file = std::path::Path::new(path);
+        if !file.exists() {
+            report.push(format!("{family}: 未找到 {path}"));
+            continue;
+        }
+        let bytes = match std::fs::read(file) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                report.push(format!("{family}: 读取失败 {error}"));
+                continue;
+            }
+        };
+        let mut collection = shared_collection();
+        let registered = collection.register_fonts(fontique::Blob::new(Arc::new(bytes)), None);
+        if registered.is_empty() {
+            report.push(format!("{family}: 注册未返回可用字体"));
+            continue;
+        }
+        let ids: Vec<_> = registered.iter().map(|(id, _)| *id).collect();
+        let appended = collection.append_fallbacks(
+            fontique::FallbackKey::new("Hani", None),
+            ids.iter().copied(),
+        );
+        report.push(format!(
+            "{family}: 已注册 {} 个字体，汉字 fallback {}",
+            ids.len(),
+            if appended { "已追加" } else { "未生效" }
+        ));
+        if chosen.is_none() {
+            chosen = Some((*family).to_owned());
+        }
+    }
+    let family = chosen.unwrap_or_else(|| {
+        let fallback = if cfg!(target_os = "windows") {
+            "Microsoft YaHei UI"
+        } else if cfg!(target_os = "macos") {
+            "PingFang SC"
+        } else {
+            "Noto Sans CJK SC"
+        };
+        report.push(format!("未注册到任何字体，回退到系统字体名 {fallback}"));
+        fallback.to_owned()
+    });
+    (family, report)
+}
+
 fn log(ui: &AppWindow, message: &str) {
     let old = ui.get_log_text();
     let text = format!(
@@ -256,17 +350,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 坏文件已被备份成 settings.json.bak 时 path 不再存在，此时照常保存；
     // 只有备份也失败（原文件仍在）才跳过保存，避免覆盖用户数据。
     let preserve_settings = warning.is_some() && dir.join("settings.json").exists();
+    let (ui_font, font_report) = install_ui_font();
     let ui = AppWindow::new()?;
-    ui.set_ui_font(
-        if cfg!(target_os = "windows") {
-            "Microsoft YaHei UI"
-        } else if cfg!(target_os = "macos") {
-            "PingFang SC"
-        } else {
-            "Noto Sans CJK SC"
-        }
-        .into(),
-    );
+    ui.set_ui_font(ui_font.into());
     ui.set_dark(prefs.dark);
     ui.set_runs(prefs.runs.clone().into());
     ui.set_distance(prefs.distance.clone().into());
@@ -863,7 +949,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ui.invoke_prepare_login();
             login_smoke_test(ui.as_weak(), dir, Instant::now());
         } else {
-            smoke_test(&ui, &dir, started)?;
+            smoke_test(&ui, &dir, started, font_report)?;
         }
     }
     slint::run_event_loop()?;
@@ -922,6 +1008,7 @@ fn smoke_test(
     ui: &AppWindow,
     dir: &Path,
     started: Instant,
+    font_report: Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(dir)?;
     let dir = dir.to_owned();
@@ -945,7 +1032,7 @@ fn smoke_test(
             std::fs::write(
                 dir.join("smoke-result.json"),
                 serde_json::to_string_pretty(
-                    &serde_json::json!({"window_ready_with_300ms_delay_ms":shown_ms,"preview":ui.get_preview_summary().as_str(),"input_validation":true,"version":env!("APP_VERSION")}),
+                    &serde_json::json!({"window_ready_with_300ms_delay_ms":shown_ms,"preview":ui.get_preview_summary().as_str(),"input_validation":true,"version":env!("APP_VERSION"),"ui_font":ui.get_ui_font().as_str(),"font_candidates":font_report}),
                 )?,
             )?;
             Ok(())
@@ -1103,4 +1190,27 @@ fn save_snapshot(ui: &AppWindow, path: &Path) -> Result<(), Box<dyn std::error::
         image::ColorType::Rgba8,
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod font_tests {
+    use super::*;
+
+    /// 注册流程本身要能在本机跑通：候选文件存在时，家族名必须能在 Slint 自己的
+    /// 字体库里解析出来，否则界面又退回「中文不渲染」。
+    #[test]
+    fn registered_cjk_family_resolves_in_slints_collection() {
+        let (family, report) = install_ui_font();
+        assert!(
+            report.iter().any(|line| line.contains("已注册")) || !report.is_empty(),
+            "字体候选必须有诊断输出"
+        );
+        if report.iter().any(|line| line.contains("已注册")) {
+            let mut collection = slint::fontique_07::shared_collection();
+            assert!(
+                collection.family_id(&family).is_some(),
+                "注册后家族 {family} 应能解析，报告：{report:?}"
+            );
+        }
+    }
 }
