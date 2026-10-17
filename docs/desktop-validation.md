@@ -79,3 +79,18 @@
 修法：启动时按「家族名 + 系统字体文件路径」候选列表读取字体文件，用 `slint::fontique_07::shared_collection()` 注册进 Slint 自己的字体库，把第一个注册成功的家族设为界面字体，并追加为汉字（`Hani`）的 fallback。候选：macOS `PingFang.ttc` / `Hiragino Sans GB.ttc` / `STHeiti Medium.ttc` / `Arial Unicode.ttf`，Windows `msyh.ttc` / `simhei.ttf`，Linux Noto Sans CJK / WenQuanYi Zen Hei；全部不可用时回退到原来的系统字体名。注册与 fallback 结果写进 `smoke-result.json` 的 `ui_font` 与 `font_candidates`，便于排查同类问题。该改动同时消除了对系统字体枚举行为的依赖，Windows / Linux 未发现视觉回归。
 
 `slint` 因此启用了 `unstable-fontique-07`（Slint 官方提供的运行时字体注册接口，见 `fontique_07` 模块文档）。真机 macOS 仍需人工确认一次中文显示。
+
+## 百度 / OpenStreetMap 双引擎（2026-10-17）
+
+用户实测 OSM 在当前网络不可用，而 Rust 版把旧 Qt 的百度底图删掉了。本轮把 provider 选择放回 HTML 页面：预览页与规划器均**默认百度地图**，页面内可切 OpenStreetMap，不改 Slint 应用界面。坐标契约不变：规划器统一存 BD09，百度点击直接入库，OSM 点击 WGS84 → BD09；预览页收到 GCJ02，显示时转百度 BD09 或 OSM WGS84。
+
+本机 macOS 27 arm64、Rust 1.99.1、Release 构建，`--map-smoke-test` 生成两页后用 Headless Chrome 154 + CDP 实测：
+
+- 两页默认百度均显示「百度地图已加载」，底图瓦片正常；百度 AK 接受本机 loopback 页面。规划器点击地图后 `coordinates` 得到 BD09 坐标（中心附近 `121.442938, 31.031568`）。
+- 切到 OSM 后采集点保留（切换前后均为 2 点），Leaflet 从 unpkg 按需加载成功；当前网络下 OSM 瓦片返回 `ERR_CONNECTION_RESET`，页面按预期显示底图失败提示，轨迹与采集仍可用。这与用户报告的 OSM 不可用一致，也说明百度默认值的必要性。
+- OSM 模式下点击同样写入 BD09（`121.444655, 31.030156`），与百度模式坐标范围一致。来回切换 provider 后地图重建、标记数量正确。
+- 规划的标记删除验证通过：百度模式下点击标记后点数从 1 变 0，不会再被冒泡的 map click 补回；随后点击地图恢复为 1。OSM 模式标记删除同样为 1 → 0 → 1。
+- Baidu BMap 初始化需要 `'unsafe-eval'`。CSP 已在 `script-src` 放行它，并限定百度域名（`api.map.baidu.com`、`*.baidu.com`、`*.bdimg.com`、`*.bdstatic.com`，http/https）；OSM/unpkg 源保持原样，表单、base-uri 与 frame-ancestors 仍关闭。
+- 百度 loader 带 `referrerpolicy="no-referrer"`，页面本身仍保留 `strict-origin-when-cross-origin` 供 OSM 使用。
+
+尚未验收：Windows / Linux 真机上的百度与 OSM 渲染、Baidu AK 的其他网络环境、真实上传。`--map-smoke-test` 只证明页面可启动与坐标契约，地图渲染由上述浏览器检查覆盖。

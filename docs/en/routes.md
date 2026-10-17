@@ -26,14 +26,14 @@ This is where people get burned:
 | **GCJ02** | Amap / Tencent maps; **the client shifts to this before uploading** |
 | **BD09** | Baidu maps; **this is what route files store** |
 
-The desktop planner picks points on OSM (WGS84) and **converts each click to BD09 immediately**, so exported txt files remain compatible with legacy routes and with the upload pipeline. Mobile keeps using BD09.
+Desktop map pages **default to Baidu Maps** and offer an in-page switch to OpenStreetMap. Baidu clicks are already BD09; OSM clicks are WGS84 and are converted to BD09 before being stored, so exported txt files remain compatible with legacy routes and with the upload pipeline. Mobile keeps using BD09.
 
-> **Desktop** has moved to Leaflet + OpenStreetMap; **Android / HarmonyOS** route design still uses the Baidu Maps API. Only the base map differs — the exported coordinate format is identical.
+> **Desktop** defaults to Baidu Maps and can switch to Leaflet + OpenStreetMap inside the page; **Android / HarmonyOS** route design still uses the Baidu Maps API. Only the base map differs — the exported coordinate format is identical.
 
 ## Route planner (desktop)
 
 1. Click "Design route" on the main screen to open the embedded planner over loopback HTTP. Keep the client running to reload it, and reopen from the app after restarting the client.
-2. Click points on the OpenStreetMap to trace a route.
+2. Click points on the map to trace a route (Baidu Maps by default, switchable to OpenStreetMap in the page).
 3. You can **add, remove individual points, or clear all points**.
 4. Click "Download route txt" to get `custom_route.txt`.
 5. Back in the main window, click **Import TXT** to import it.
@@ -52,7 +52,7 @@ The route is copied into the **`routes/` folder in the OS user data directory** 
 
 1. Select it in the desktop "Select route" dropdown.
 2. Click "Preview actual track", then "Open in map" (no login needed).
-3. Check on the OSM map:
+3. Check on the map (Baidu by default, switchable to OpenStreetMap):
    - Any red highlighted segment means a jump (> 150 m);
    - Whether the green start and red finish are close together;
    - Whether total length matches your target distance.

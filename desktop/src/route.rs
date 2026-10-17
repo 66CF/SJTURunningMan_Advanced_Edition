@@ -221,25 +221,23 @@ pub fn resample(points: &[Point], target_m: f64, step_m: f64) -> Result<Vec<Poin
     Ok(result)
 }
 
+pub const BAIDU_MAP_AK: &str = "MYUXpppuOOvq99cP2AmDvplAW76VV8vr";
+const PREVIEW_TEMPLATE: &str = include_str!("route_preview.html");
+
 pub fn preview_html(points: &[Point], title: &str) -> String {
-    // BD09 原始路线与 GCJ02 payload 在调用端统一为 GCJ02，显示时转到 WGS84。
+    // BD09 原始路线与 GCJ02 payload 在调用端统一为 GCJ02；页面按所选引擎
+    // 显示时再转 BD09（百度）或 WGS84（OpenStreetMap）。
     let points = serde_json::to_string(points).unwrap_or_else(|_| "[]".into());
     let title = title
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;");
-    format!(
-        r##"<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="referrer" content="strict-origin-when-cross-origin"><title>{title}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body{{height:100%}}body{{margin:0;background:#edf3f0;font:14px system-ui;display:flex;flex-direction:column}}header{{padding:14px 24px;color:#17382e;display:flex;gap:12px;flex-wrap:wrap;flex-shrink:0}}#map-status{{color:#607c70}}#map-status.error{{color:#a94837}}#map{{flex:1;min-height:0;background:#e7eee8}}</style><header>{title} · GCJ02 → WGS84 · 红线表示原始跳段超过 150 m <span id="map-status" role="status" aria-live="polite">正在加载底图…</span></header><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-const raw={points};
-function wgs(p){{let x=p.lon-105,y=p.lat-35,pi=Math.PI;let lat=-100+2*x+3*y+.2*y*y+.1*x*y+.2*Math.sqrt(Math.abs(x));lat+=(20*Math.sin(6*x*pi)+20*Math.sin(2*x*pi))*2/3+(20*Math.sin(y*pi)+40*Math.sin(y*pi/3))*2/3+(160*Math.sin(y*pi/12)+320*Math.sin(y*pi/30))*2/3;let lon=300+x+2*y+.1*x*x+.1*x*y+.1*Math.sqrt(Math.abs(x));lon+=(20*Math.sin(6*x*pi)+20*Math.sin(2*x*pi))*2/3+(20*Math.sin(x*pi)+40*Math.sin(x*pi/3))*2/3+(150*Math.sin(x*pi/12)+300*Math.sin(x*pi/30))*2/3;let rad=p.lat/180*pi,magic=1-.006693421622965943*Math.sin(rad)**2;return [p.lat-lat*180/((6378245*(1-.006693421622965943))/(magic*Math.sqrt(magic))*pi),p.lon-lon*180/(6378245/Math.sqrt(magic)*Math.cos(rad)*pi)]}}
-const pts=raw.map(wgs),map=L.map('map'),status=document.getElementById('map-status');
-const tiles=L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,errorTileUrl:'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect width="256" height="256" fill="%23e7eee8"/%3E%3C/svg%3E'}});let tileFailed=false;
-tiles.on('loading',()=>{{tileFailed=false;status.textContent='正在加载底图…';status.className='';}});
-tiles.on('tileerror',()=>{{tileFailed=true;status.textContent='底图加载失败（网络或服务限制），轨迹仍可查看，请稍后刷新';status.className='error';}});
-tiles.on('load',()=>{{if(!tileFailed)status.textContent='底图已加载';}});tiles.addTo(map);
-map.fitBounds(pts,{{padding:[30,30]}});pts.slice(1).forEach((p,i)=>L.polyline([pts[i],p],{{color:map.distance(pts[i],p)>150?'#dc5a4f':'#168c6c',weight:4}}).addTo(map));L.circleMarker(pts[0],{{color:'#168c6c',radius:7,fillOpacity:1}}).addTo(map).bindPopup('起点');L.circleMarker(pts.at(-1),{{color:'#dc5a4f',radius:6,fillOpacity:1}}).addTo(map).bindPopup('终点');</script></html>"##
-    )
+    // 标题最后替换，避免标题里的占位符文本被再次展开。
+    PREVIEW_TEMPLATE
+        .replace("__POINTS__", &points)
+        .replace("__BAIDU_AK__", BAIDU_MAP_AK)
+        .replace("__TITLE__", &title)
 }
 
 #[cfg(test)]
@@ -286,11 +284,40 @@ mod tests {
         assert_eq!(jumps(&points), 1);
         let html = preview_html(&points, "<script>");
         assert!(html.contains("&lt;script&gt;"));
-        assert!(html.contains("GCJ02 → WGS84"));
+        assert!(html.contains("GCJ02"));
+        assert!(html.contains("id=\"provider\""));
+        assert!(html.contains("value=\"baidu\" selected"));
+        assert!(html.contains("value=\"osm\""));
+        assert!(html.contains(&format!(
+            "https://api.map.baidu.com/api?v=3.0&ak={BAIDU_MAP_AK}"
+        )));
+        assert!(html.contains("referrerpolicy=\"no-referrer\""));
+        assert!(html.contains("gcj02ToBd09"));
+        assert!(html.contains("gcj02ToWgs84"));
+        assert!(html.contains(">150"));
         assert!(html.contains("https://tile.openstreetmap.org/{z}/{x}/{y}.png"));
         assert!(html.contains("strict-origin-when-cross-origin"));
         assert!(!html.contains("https://{s}.tile.openstreetmap.org"));
         assert!(html.contains("https://www.openstreetmap.org/copyright"));
+        // Leaflet 只在切到 OpenStreetMap 时按需加载，否则百度默认页依赖 unpkg。
+        assert!(!html.contains("<script src=\"https://unpkg.com/leaflet"));
+        assert!(!html.contains("<link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet"));
+    }
+
+    #[test]
+    fn planner_exposes_baidu_and_osm_without_static_leaflet() {
+        let html = include_str!("../../route_planner.html");
+        assert!(html.contains("id=\"provider\""));
+        assert!(html.contains("value=\"baidu\" selected"));
+        assert!(html.contains("value=\"osm\""));
+        assert!(html.contains("BMap.Map"));
+        assert!(html.contains("wgs84ToBd09"));
+        assert!(html.contains("bd09ToWgs84"));
+        assert!(html.contains(&format!("api?v=3.0&ak={BAIDU_MAP_AK}")));
+        assert!(html.contains("referrerpolicy=\"no-referrer\""));
+        assert!(html.contains("https://tile.openstreetmap.org/{z}/{x}/{y}.png"));
+        assert!(!html.contains("<script src=\"https://unpkg.com/leaflet"));
+        assert!(!html.contains("<link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet"));
     }
 
     #[test]

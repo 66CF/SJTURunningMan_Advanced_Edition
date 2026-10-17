@@ -45,7 +45,7 @@ SJTURunningMan_Advanced_Edition/
 ├── assets/                 Icons, backgrounds, built-in routes (assets/Routes/)
 ├── main.spec               Legacy PyInstaller config (migration reference)
 ├── build_windows.ps1       Windows packaging script
-├── route_planner.html      Desktop route planner (Leaflet + OpenStreetMap)
+├── route_planner.html      Desktop route planner (Baidu by default, OpenStreetMap optional)
 ├── apps/
 │   ├── android/            Android project (Kotlin / Jetpack Compose)
 │   ├── ios/                iOS project (Swift / SwiftUI)

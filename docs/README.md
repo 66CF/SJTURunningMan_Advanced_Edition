@@ -45,7 +45,7 @@ SJTURunningMan_Advanced_Edition/
 ├── assets/                 图标、背景、内置路线（assets/Routes/）
 ├── main.spec               旧 PyInstaller 配置（迁移对照）
 ├── build_windows.ps1       Windows 打包脚本
-├── route_planner.html      电脑版路线规划器（Leaflet + OpenStreetMap）
+├── route_planner.html      电脑版路线规划器（默认百度，可切 OpenStreetMap）
 ├── apps/
 │   ├── android/            安卓工程（Kotlin / Jetpack Compose）
 │   ├── ios/                iOS 工程（Swift / SwiftUI）

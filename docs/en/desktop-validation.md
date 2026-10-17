@@ -79,3 +79,18 @@ Pixel inspection shows a zero advance width for the Han characters (the slash si
 Fix: at startup, walk a candidate list of "family name + system font file path", read the file, register it with `slint::fontique_07::shared_collection()` into Slint's own font collection, use the first family that registers as the UI font, and append it as a fallback for the Han script (`Hani`). Candidates: macOS `PingFang.ttc` / `Hiragino Sans GB.ttc` / `STHeiti Medium.ttc` / `Arial Unicode.ttf`, Windows `msyh.ttc` / `simhei.ttf`, Linux Noto Sans CJK / WenQuanYi Zen Hei; if none is usable the previous system family name is kept. Registration and fallback results are written to `smoke-result.json` as `ui_font` and `font_candidates`. This also removes the dependency on system font enumeration behaviour; no visual regression was found on Windows/Linux.
 
 `slint` therefore enables `unstable-fontique-07` (Slint's official runtime font registration interface, see the `fontique_07` module docs). macOS still needs one manual confirmation of Chinese text on real hardware.
+
+## Baidu / OpenStreetMap dual engine (2026-10-17)
+
+OSM was unusable from the user's network, and the Rust rewrite had dropped the old Qt client's Baidu basemap. This change puts the provider choice back inside the HTML pages: both preview and planner **default to Baidu Maps** with an in-page OpenStreetMap switch, without touching the Slint UI. The coordinate contract is unchanged: the planner stores BD09, Baidu clicks are stored as-is, OSM clicks are WGS84 and converted to BD09 before storage; the preview receives GCJ02 and converts to BD09 for Baidu or WGS84 for OSM at display time.
+
+Verified on local macOS 27 arm64, Rust 1.99.1, Release build: `--map-smoke-test` generated both pages and Headless Chrome 154 + CDP drove them:
+
+- Both pages load Baidu by default ("百度地图已加载" / Baidu map loaded) with basemap tiles; the Baidu AK accepts the loopback page. A planner click near the centre stores BD09 `121.442938, 31.031568`.
+- Switching to OSM keeps collected points (2 before and after); Leaflet loads from unpkg on demand. On this network OSM tiles return `ERR_CONNECTION_RESET`; the page shows its basemap failure notice while the track and point collection remain usable. This matches the user's OSM report and justifies the Baidu default.
+- In OSM mode a click is also stored as BD09 (`121.444655, 31.030156`), in the same range as Baidu mode. Switching back and forth rebuilds the map with the expected marker count.
+- Marker deletion verified: in Baidu mode a marker click takes the point count 1 → 0 and the bubbling map click no longer adds a replacement; the next map click restores 1. OSM marker deletion also goes 1 → 0 → 1.
+- Baidu BMap initialisation needs `'unsafe-eval'`. The CSP now allows it and limits Baidu hosts (`api.map.baidu.com`, `*.baidu.com`, `*.bdimg.com`, `*.bdstatic.com`, http/https); OSM/unpkg sources are unchanged, and form actions, base-uri, and frame-ancestors remain locked down.
+- The Baidu loader uses `referrerpolicy="no-referrer"`; the page keeps `strict-origin-when-cross-origin` for OSM.
+
+Not yet verified: Baidu/OSM rendering on real Windows/Linux, Baidu AK behaviour on other networks, and real uploads. `--map-smoke-test` proves launch and coordinate contracts; rendering is covered by the browser checks above.

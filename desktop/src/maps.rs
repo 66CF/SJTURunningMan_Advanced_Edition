@@ -130,13 +130,25 @@ fn serve(
     }
 }
 
-/// 页面自身用内联脚本和样式，只允许从 unpkg 取 Leaflet、从 OSM 取瓦片；
-/// 禁止 XHR / fetch / 表单提交，即使页面内容被污染也拿不到外部信道。
-const CONTENT_SECURITY_POLICY: &str =
-    "default-src 'none'; script-src 'unsafe-inline' https://unpkg.com; \
-style-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://unpkg.com \
-https://tile.openstreetmap.org; font-src https://unpkg.com; connect-src 'none'; base-uri 'none'; \
-form-action 'none'; frame-ancestors 'none'";
+/// 页面自身用内联脚本和样式：Leaflet 来自 unpkg，瓦片来自 OSM 或百度。
+/// 百度 BMap 会继续加载 bdimg / bdstatic 下的脚本、样式、图片和瓦片，并在初始化时
+/// 使用 eval，因此 script-src 需要额外放行 'unsafe-eval'。其余外部源、表单提交和
+/// 跨站连接仍保持关闭。
+const CONTENT_SECURITY_POLICY: &str = "default-src 'none'; \
+script-src 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://api.map.baidu.com https://*.baidu.com \
+https://*.bdimg.com https://*.bdstatic.com http://api.map.baidu.com http://*.baidu.com \
+http://*.bdimg.com http://*.bdstatic.com; \
+style-src 'unsafe-inline' https://unpkg.com https://api.map.baidu.com https://*.baidu.com \
+https://*.bdimg.com https://*.bdstatic.com; \
+img-src 'self' data: https://unpkg.com https://tile.openstreetmap.org https://api.map.baidu.com \
+https://*.baidu.com https://*.bdimg.com https://*.bdstatic.com http://*.baidu.com \
+http://*.bdimg.com http://*.bdstatic.com; \
+font-src https://unpkg.com https://api.map.baidu.com https://*.baidu.com https://*.bdimg.com \
+https://*.bdstatic.com; \
+connect-src https://api.map.baidu.com https://*.baidu.com https://*.bdimg.com \
+https://*.bdstatic.com http://api.map.baidu.com http://*.baidu.com http://*.bdimg.com \
+http://*.bdstatic.com; \
+base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 fn respond(stream: &mut TcpStream, status: u16, body: &str, head: bool) -> std::io::Result<()> {
     write!(stream, "HTTP/1.1 {status} {}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nReferrer-Policy: strict-origin-when-cross-origin\r\nContent-Security-Policy: {CONTENT_SECURITY_POLICY}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n", if status == 200 {"OK"} else {"Error"}, body.len())?;
@@ -178,7 +190,15 @@ mod tests {
         assert!(response.starts_with("HTTP/1.1 200"));
         assert!(response.contains("Referrer-Policy: strict-origin-when-cross-origin\r\n"));
         assert!(response.contains("Content-Security-Policy: default-src 'none';"));
-        assert!(response.contains("connect-src 'none';"));
+        assert!(response.contains("script-src 'unsafe-inline' 'unsafe-eval'"));
+        assert!(response.contains("https://api.map.baidu.com"));
+        assert!(response.contains("https://*.bdimg.com"));
+        assert!(response.contains("https://*.bdstatic.com"));
+        assert!(response.contains("connect-src https://api.map.baidu.com"));
+        assert!(!response.contains("connect-src 'none'"));
+        assert!(response.contains("base-uri 'none'"));
+        assert!(response.contains("form-action 'none'"));
+        assert!(response.contains("frame-ancestors 'none'"));
         assert!(!response.contains("Access-Control-Allow-Origin"));
         assert!(response.ends_with("<html>路线</html>"));
         assert!(request(&server, "GET", url.path(), "outside.invalid").starts_with("HTTP/1.1 403"));

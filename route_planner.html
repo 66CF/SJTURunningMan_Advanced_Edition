@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>路线规划器</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         body, html {
             margin: 0;
@@ -31,6 +30,7 @@
             max-height: 80vh;
             overflow-y: auto;
             font-size: 14px;
+            box-sizing: border-box;
         }
         #coordinate-list {
             max-height: 300px;
@@ -97,12 +97,37 @@
         .control-group {
             margin: 10px 0;
         }
+        .provider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+        .provider-row select {
+            flex: 1;
+            font: inherit;
+            padding: 4px 8px;
+            border: 1px solid #b9c9c1;
+            border-radius: 6px;
+            background: #fff;
+            color: #17382e;
+        }
     </style>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=MYUXpppuOOvq99cP2AmDvplAW76VV8vr" referrerpolicy="no-referrer" onerror="window.__baiduFailed=true"></script>
 </head>
 <body>
     <div id="info">
         <h3>🗺️ 路线规划器</h3>
         <p>点击地图任意位置采集坐标点，形成跑步路线。下载 txt 后，回到软件点击“导入 TXT”添加。</p>
+
+        <div class="provider-row">
+            <label for="provider">地图引擎:</label>
+            <select id="provider">
+                <option value="baidu" selected>百度地图（默认）</option>
+                <option value="osm">OpenStreetMap</option>
+            </select>
+        </div>
 
         <div class="control-group">
             <button onclick="clearAllMarkers()" class="clear">清空所有点</button>
@@ -120,13 +145,12 @@
     </div>
     <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-
-    // 坐标系统一说明：OSM 瓦片为 WGS84；导出/旧路线文件为百度 BD09；上传前由软件端平移校正为高德/腾讯 GCJ02。
-    // 本页面在点击处（WGS84）实时转成 BD09 保存，保证与旧路线及上传流程完全兼容。
+    // 坐标契约：coordinates 统一保存百度 BD09，与旧路线文件和上传流程兼容。
+    // 百度地图点击直接给出 BD09；OSM 点击给出 WGS84，入数组前转成 BD09。
     var PI = 3.1415926535897932384626;
     var X_PI = PI * 3000.0 / 180.0;
+    var CENTER_BD09 = { lng: 121.442938, lat: 31.031599 };
     function outOfChina(lng, lat) {
         return !(72.004 <= lng && lng <= 137.8347 && 0.8293 <= lat && lat <= 55.8271);
     }
@@ -182,149 +206,227 @@
         return gcj02ToWgs84(g.lng, g.lat);
     }
 
-        // 初始化地图（OpenStreetMap 瓦片）
-        var map = L.map('map');
-        var mapStatus = document.getElementById('map-status');
-        var tileFailed = false;
-        var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            errorTileUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect width="256" height="256" fill="%23e7eee8"/%3E%3C/svg%3E'
-        });
-        tiles.on('loading', function() {
-            tileFailed = false;
-            mapStatus.textContent = '正在加载底图…';
-            mapStatus.className = '';
-        });
-        tiles.on('tileerror', function() {
-            tileFailed = true;
-            mapStatus.textContent = '底图加载失败（网络或服务限制），仍可编辑路线，请稍后刷新。';
-            mapStatus.className = 'warning';
-        });
-        tiles.on('load', function() {
-            if (!tileFailed) {
-                mapStatus.textContent = '底图已加载';
-                mapStatus.className = 'success';
+    var providerEl = document.getElementById('provider');
+    var mapStatus = document.getElementById('map-status');
+    var statusDiv = document.getElementById('status');
+    var coordinateList = document.getElementById('coordinate-list');
+    // coordinates 只保存 BD09；切换地图引擎不会丢点。
+    var coordinates = [];
+    var current = null;
+    var desiredCenter = { lng: CENTER_BD09.lng, lat: CENTER_BD09.lat, zoom: 15 };
+    var leafletPromise = null;
+    // BMap 的 marker click 之后还会冒泡出一次 map click，用它避免删点同时又补一个点。
+    var suppressMapClick = false;
+
+    function setMapStatus(text, error) {
+        mapStatus.textContent = text;
+        mapStatus.className = error ? 'warning' : '';
+    }
+    function freshMapElement() {
+        var old = document.getElementById('map');
+        var el = document.createElement('div');
+        el.id = 'map';
+        old.parentNode.replaceChild(el, old);
+        return el;
+    }
+    function loadLeaflet() {
+        if (window.L) return Promise.resolve();
+        if (leafletPromise) return leafletPromise;
+        leafletPromise = new Promise(function (resolve, reject) {
+            var css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(css);
+            var script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.onload = function () { window.L ? resolve() : reject(new Error('Leaflet')); };
+            script.onerror = function () { reject(new Error('Leaflet')); };
+            document.head.appendChild(script);
+        }).catch(function (error) { leafletPromise = null; throw error; });
+        return leafletPromise;
+    }
+    function captureCenter() {
+        if (!current) return;
+        try {
+            var c = current.map.getCenter();
+            if (current.kind === 'baidu') {
+                desiredCenter = { lng: c.lng, lat: c.lat, zoom: current.map.getZoom() };
+            } else {
+                var b = wgs84ToBd09(c.lng, c.lat);
+                desiredCenter = { lng: b.lng, lat: b.lat, zoom: current.map.getZoom() };
             }
-        });
-        tiles.addTo(map);
-        var statusDiv = document.getElementById('status');
-        var coordinateList = document.getElementById('coordinate-list');
-
-        // 设置中心点（上海交通大学闵行校区，百度坐标转 WGS84）
-        var center = bd09ToWgs84(121.442938, 31.031599);
-        map.setView([center.lat, center.lng], 15);
-
-        // 存储坐标的数组（lng/lat 为导出用的 BD09，wlng/wlat 为点击处的 WGS84）
-        var coordinates = [];
-        var markers = [];
-
-        // 添加地图点击事件
-        map.on('click', function(e) {
-            var wlng = e.latlng.lng;
-            var wlat = e.latlng.lat;
-            var bd = wgs84ToBd09(wlng, wlat);
-
-            var coord = {
-                lng: bd.lng,
-                lat: bd.lat,
-                wlng: wlng,
-                wlat: wlat,
-                timestamp: Date.now()
-            };
-            coordinates.push(coord);
-
-            // 在点击位置添加标记
-            var marker = L.marker([wlat, wlng]).addTo(map);
-            marker.bindTooltip(
-                '经度: ' + bd.lng.toFixed(6) + '<br/>纬度: ' + bd.lat.toFixed(6) +
-                '<br/><small>点击标记可删除</small>',
-                { direction: 'top' }
-            );
-            markers.push(marker);
-
-            // 点击标记删除该点
-            marker.on('click', function() {
-                map.removeLayer(marker);
-                var index = coordinates.findIndex(function(c) {
-                    return Math.abs(c.lng - coord.lng) < 0.000001 && Math.abs(c.lat - coord.lat) < 0.000001;
+        } catch (_) {}
+    }
+    function addCoordinate(lng, lat) {
+        coordinates.push({ lng: lng, lat: lat, timestamp: Date.now() });
+        refreshMarkers();
+        updateCoordinateList();
+    }
+    function removeCoordinate(coord) {
+        var index = coordinates.indexOf(coord);
+        if (index > -1) coordinates.splice(index, 1);
+        refreshMarkers();
+        updateCoordinateList();
+    }
+    function refreshMarkers() {
+        if (!current) return;
+        if (current.kind === 'baidu') {
+            current.map.clearOverlays();
+            coordinates.forEach(function (coord) {
+                var marker = new BMap.Marker(new BMap.Point(coord.lng, coord.lat));
+                marker.addEventListener('click', function () {
+                    suppressMapClick = true;
+                    removeCoordinate(coord);
+                    setTimeout(function () { suppressMapClick = false; }, 0);
                 });
-                if (index > -1) {
-                    coordinates.splice(index, 1);
-                }
-                var markerIndex = markers.indexOf(marker);
-                if (markerIndex > -1) {
-                    markers.splice(markerIndex, 1);
-                }
-                updateCoordinateList();
+                current.map.addOverlay(marker);
             });
-
-            updateCoordinateList();
+        } else {
+            current.markers.forEach(function (marker) { current.map.removeLayer(marker); });
+            current.markers = coordinates.map(function (coord) {
+                var w = bd09ToWgs84(coord.lng, coord.lat);
+                var marker = L.marker([w.lat, w.lng]).addTo(current.map);
+                marker.on('click', function () { removeCoordinate(coord); });
+                return marker;
+            });
+        }
+    }
+    function renderBaidu() {
+        if (window.__baiduFailed || typeof BMap === 'undefined') {
+            setMapStatus('百度地图加载失败（网络或 AK 限制）；可切换到 OpenStreetMap。', true);
+            return;
+        }
+        try {
+            if (current && current.kind === 'osm') current.map.remove();
+            var map = new BMap.Map(freshMapElement());
+            current = { kind: 'baidu', map: map };
+            map.centerAndZoom(new BMap.Point(desiredCenter.lng, desiredCenter.lat), desiredCenter.zoom);
+            map.enableScrollWheelZoom(true);
+            map.addControl(new BMap.NavigationControl());
+            map.addControl(new BMap.ScaleControl());
+            map.addControl(new BMap.MapTypeControl());
+            map.addEventListener('click', function (e) {
+                if (suppressMapClick) return;
+                addCoordinate(e.point.lng, e.point.lat);
+            });
+            refreshMarkers();
+            var loaded = false;
+            map.addEventListener('tilesloaded', function () {
+                if (!loaded) {
+                    loaded = true;
+                    setMapStatus('百度地图已加载', false);
+                    statusDiv.textContent = '点击地图开始采集坐标。';
+                    statusDiv.className = 'success';
+                }
+            });
+            setTimeout(function () {
+                if (!loaded && current && current.kind === 'baidu') {
+                    setMapStatus('百度底图加载失败（网络或 AK 限制）；可切换到 OpenStreetMap。', true);
+                }
+            }, 10000);
+            setMapStatus('正在加载百度底图…', false);
+        } catch (_) {
+            setMapStatus('百度地图初始化失败；可切换到 OpenStreetMap。', true);
+        }
+    }
+    function renderOsm() {
+        loadLeaflet().then(function () {
+            if (typeof L === 'undefined') {
+                setMapStatus('OpenStreetMap 加载失败（网络）；可切换到百度地图。', true);
+                return;
+            }
+            try {
+                if (current && current.kind === 'osm') current.map.remove();
+                var map = L.map(freshMapElement());
+                current = { kind: 'osm', map: map, markers: [] };
+                var center = bd09ToWgs84(desiredCenter.lng, desiredCenter.lat);
+                map.setView([center.lat, center.lng], desiredCenter.zoom);
+                var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    errorTileUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect width="256" height="256" fill="%23e7eee8"/%3E%3C/svg%3E'
+                });
+                var tileFailed = false;
+                tiles.on('loading', function () {
+                    tileFailed = false;
+                    setMapStatus('正在加载底图…', false);
+                });
+                tiles.on('tileerror', function () {
+                    tileFailed = true;
+                    setMapStatus('底图加载失败（网络或服务限制），仍可编辑路线，请稍后刷新。', true);
+                });
+                tiles.on('load', function () {
+                    if (!tileFailed) setMapStatus('底图已加载', false);
+                });
+                tiles.addTo(map);
+                map.on('click', function (e) {
+                    var b = wgs84ToBd09(e.latlng.lng, e.latlng.lat);
+                    addCoordinate(b.lng, b.lat);
+                });
+                refreshMarkers();
+            } catch (_) {
+                setMapStatus('OpenStreetMap 初始化失败；可切换到百度地图。', true);
+            }
+        }, function () {
+            setMapStatus('OpenStreetMap 加载失败（网络）；可切换到百度地图。', true);
         });
+    }
+    function render(kind) {
+        captureCenter();
+        if (kind === 'osm') renderOsm(); else renderBaidu();
+    }
 
-        // 更新坐标列表显示
-        function updateCoordinateList() {
-            coordinateList.innerHTML = '';
+    providerEl.addEventListener('change', function () { render(providerEl.value); });
 
-            if (coordinates.length === 0) {
-                coordinateList.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">点击地图开始采集坐标...</div>';
-                return;
-            }
-
-            coordinates.forEach(function(coord, index) {
-                var coordDiv = document.createElement('div');
-                coordDiv.className = 'coord-item';
-                coordDiv.innerHTML =
-                    '<strong>#' + (index + 1) + '</strong><br/>' +
-                    '经度: ' + coord.lng.toFixed(6) + '<br/>' +
-                    '纬度: ' + coord.lat.toFixed(6);
-                coordinateList.appendChild(coordDiv);
-            });
+    function updateCoordinateList() {
+        coordinateList.innerHTML = '';
+        if (coordinates.length === 0) {
+            coordinateList.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">点击地图开始采集坐标...</div>';
+            return;
         }
+        coordinates.forEach(function (coord, index) {
+            var coordDiv = document.createElement('div');
+            coordDiv.className = 'coord-item';
+            coordDiv.innerHTML =
+                '<strong>#' + (index + 1) + '</strong><br/>' +
+                '经度: ' + coord.lng.toFixed(6) + '<br/>' +
+                '纬度: ' + coord.lat.toFixed(6);
+            coordinateList.appendChild(coordDiv);
+        });
+    }
 
-        // 清空所有标记
-        function clearAllMarkers() {
-            markers.forEach(function(marker) {
-                map.removeLayer(marker);
-            });
-            markers = [];
-            coordinates = [];
-            updateCoordinateList();
-            statusDiv.innerHTML = "所有坐标已清空";
-            statusDiv.className = "success";
+    function clearAllMarkers() {
+        coordinates = [];
+        refreshMarkers();
+        updateCoordinateList();
+        statusDiv.innerHTML = '所有坐标已清空';
+        statusDiv.className = 'success';
+    }
+
+    // 导出坐标为文件（BD09 百度经纬度，与旧版一致）
+    function exportCoordinates() {
+        if (coordinates.length < 2) {
+            alert('请至少选择2个坐标点！');
+            return;
         }
+        var coordText = '';
+        coordinates.forEach(function (coord) {
+            coordText += coord.lng + ',' + coord.lat + '\n';
+        });
+        var blob = new Blob([coordText], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'custom_route.txt';
+        document.body.appendChild(a);
+        statusDiv.innerHTML = '✓ 已下载 custom_route.txt。<br/>请回到软件，点击“导入 TXT”添加。 (' + coordinates.length + '个点)';
+        statusDiv.className = 'success';
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
-        // 导出坐标为文件（BD09 百度经纬度，与旧版一致）
-        function exportCoordinates() {
-            if (coordinates.length < 2) {
-                alert("请至少选择2个坐标点！");
-                return;
-            }
-
-            let coordText = "";
-            coordinates.forEach(function(coord) {
-                coordText += coord.lng + "," + coord.lat + "\n";
-            });
-
-            // Create download link
-            var blob = new Blob([coordText], { type: 'text/plain' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'custom_route.txt';
-            document.body.appendChild(a);
-
-            // Show import instructions for the desktop UI.
-            statusDiv.innerHTML = '✓ 已下载 custom_route.txt。<br/>请回到软件，点击“导入 TXT”添加。 (' + coordinates.length + '个点)';
-            statusDiv.className = "success";
-
-            // Programmatically click the link
-            a.click();
-
-            // Clean up
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+    render(providerEl.value);
     </script>
 </body>
 </html>

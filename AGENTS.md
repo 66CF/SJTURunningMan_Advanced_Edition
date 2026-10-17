@@ -25,7 +25,7 @@ utils/auxiliary_util.py
 assets/                图标、背景、内置路线（assets/Routes/）
 main.spec              旧 PyInstaller 配置，默认发布不再使用
 build_windows.ps1      Rust Windows Release 构建并复制到 dist/
-route_planner.html     电脑版路线规划器（Leaflet + OSM）
+route_planner.html     电脑版路线规划器（默认百度，可切 OSM）
 apps/android/          安卓（Kotlin + Compose）
 apps/ios/              iOS（Swift + SwiftUI）
 apps/harmonyos/        鸿蒙（ArkTS）
@@ -39,7 +39,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 2. **版本号**：新桌面版看 `desktop/Cargo.toml` 的 `version`（`desktop/build.rs` 读取，release.yml 会断言与 tag 一致）；`src/config.py` 的 `global_version` 只对应保留的旧 Qt 客户端。都与移动端版本号无关。位置见 [CONTRIBUTING.md](CONTRIBUTING.md#版本号)。
 3. **`assets/resources_rc.py` 是真实依赖**，不是可删的构建产物 —— `src/info_dialog.py` 直接 import 它，`main.spec` 也把它列进 hiddenimports。没有对应的 `.qrc` 源文件，这个生成文件就是唯一来源。
 4. **`assets/Routes/NeedsReview/` 是隔离区。** 里面的路线有跳段 / 长度 / 起终点问题，不要直接把它们加回内置列表。
-5. **路线坐标系**：路线文件存 BD09，OSM 瓦片是 WGS84，上传前由客户端转 GCJ02。见 [docs/routes.md](docs/routes.md)。
+5. **路线坐标系**：路线文件存 BD09；桌面地图页默认百度、可切 OSM，百度点击直接是 BD09，OSM 瓦片是 WGS84、点击后转 BD09 保存，上传前由客户端转 GCJ02。见 [docs/routes.md](docs/routes.md)。
 6. **内层路径随目录整体搬迁后仍成立**（Gradle、Xcode pbxproj、hvigor 都是相对引用）。移动 `apps/<平台>/` 只需同步 `.gitignore` 里的前缀规则。
 
 ## 四套实现的对应关系
