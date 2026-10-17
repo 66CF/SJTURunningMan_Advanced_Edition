@@ -130,6 +130,9 @@ fn cjk_font_candidates() -> &'static [(&'static str, &'static str)] {
 /// 解析不到，界面里中文会整段不渲染、只剩数字和拉丁字母。注册文件后家族一定存在，
 /// 汉字也不依赖系统字体枚举。
 ///
+/// 第一个注册成功的候选即停止：字体文件动辄 20 MB 以上（PingFang.ttc、Arial
+/// Unicode.ttf），逐个注册既慢又平白多几处出错机会。
+///
 /// 返回 (界面字体家族, 诊断信息)，诊断信息会写进 `--smoke-test` 的报告便于排查。
 fn install_ui_font() -> (String, Vec<String>) {
     use slint::fontique_07::{fontique, shared_collection};
@@ -141,6 +144,8 @@ fn install_ui_font() -> (String, Vec<String>) {
             report.push(format!("{family}: 未找到 {path}"));
             continue;
         }
+        // 崩溃时 panic hook 会把最后一个面包屑留在 crash.log 里，便于定位是哪个候选。
+        eprintln!("注册界面字体候选：{family}（{path}）");
         let bytes = match std::fs::read(file) {
             Ok(bytes) => bytes,
             Err(error) => {
@@ -154,6 +159,7 @@ fn install_ui_font() -> (String, Vec<String>) {
             report.push(format!("{family}: 注册未返回可用字体"));
             continue;
         }
+        eprintln!("字体已注册：{family}（{} 个面）", registered.len());
         let ids: Vec<_> = registered.iter().map(|(id, _)| *id).collect();
         let appended = collection.append_fallbacks(
             fontique::FallbackKey::new("Hani", None),
@@ -164,9 +170,8 @@ fn install_ui_font() -> (String, Vec<String>) {
             ids.len(),
             if appended { "已追加" } else { "未生效" }
         ));
-        if chosen.is_none() {
-            chosen = Some((*family).to_owned());
-        }
+        chosen = Some((*family).to_owned());
+        break;
     }
     let family = chosen.unwrap_or_else(|| {
         let fallback = if cfg!(target_os = "windows") {
@@ -179,6 +184,7 @@ fn install_ui_font() -> (String, Vec<String>) {
         report.push(format!("未注册到任何字体，回退到系统字体名 {fallback}"));
         fallback.to_owned()
     });
+    eprintln!("界面字体：{family}");
     (family, report)
 }
 
@@ -350,8 +356,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 坏文件已被备份成 settings.json.bak 时 path 不再存在，此时照常保存；
     // 只有备份也失败（原文件仍在）才跳过保存，避免覆盖用户数据。
     let preserve_settings = warning.is_some() && dir.join("settings.json").exists();
-    let (ui_font, font_report) = install_ui_font();
     let ui = AppWindow::new()?;
+    // 注册字体安排在窗口（Slint 平台后端）建好之后：在 AppWindow 之前碰 fontique 的
+    // 共享集合，macOS 上启动阶段就会 Abort trap: 6。
+    let (ui_font, font_report) = install_ui_font();
     ui.set_ui_font(ui_font.into());
     ui.set_dark(prefs.dark);
     ui.set_runs(prefs.runs.clone().into());
