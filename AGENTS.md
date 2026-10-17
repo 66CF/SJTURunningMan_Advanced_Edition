@@ -78,7 +78,7 @@ cd apps/harmonyos && hvigorw assembleHap
 
 ## 测试现状
 
-Rust 电脑版有单元测试、本地 HTTP mock 和 `--smoke-test` 截图验收。`desktop-check.yml` 在三个系统运行检查，桌面 release 作业先测试再打包。安卓保留既有单元及仪器测试。旧 Qt / Python 客户端仍由 `ci-python.yml` 做语法与导入检查，但发布产物已不再包含它 —— 退役前不要在这套旧代码上投入新功能。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
+Rust 电脑版有单元测试、本地 HTTP mock 和 `--smoke-test` 截图验收。`desktop-check.yml` 在 PR / push 上只跑 fmt、clippy 和单元测试；安装包构建与三平台 smoke 只在 `release.yml`（tag 或手动发布）执行。安卓保留既有单元及仪器测试。旧 Qt / Python 客户端仍由 `ci-python.yml` 做语法与导入检查，但发布产物已不再包含它 —— 退役前不要在这套旧代码上投入新功能。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
 
 ## 修改约定
 

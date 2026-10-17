@@ -46,11 +46,11 @@ python3 scripts/package_desktop.py linux --binary target/release/sjturunningman 
 
 `APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` takes `package.version` from `desktop/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The old `qtui.py`, `main.spec`, and `requirements.txt` remain for comparison and are slated for removal once the native client has been validated.
 
-### Desktop packaging trial
+### Desktop checks and release builds
 
-`Native desktop checks` (`.github/workflows/desktop-check.yml`) runs on desktop push/PR changes and supports **Run workflow** in Actions. Without tags or Android signing secrets it builds the selected branch's Windows exe, macOS universal2 DMG, and Linux amd64/arm64 debs. Four `desktop-package-*` artifacts contain the distributable, SHA256SUMS.txt, and commit/version metadata.
+`Native desktop checks` (`.github/workflows/desktop-check.yml`) runs on desktop push/PR changes and supports **Run workflow** in Actions. It only runs `cargo fmt`, `cargo clippy`, `cargo test`, and the packaging-layout tests on Ubuntu. It builds no installers and normally finishes in a few minutes.
 
-It checks Windows product metadata, mounts the DMG to check both architectures, signature integrity and the Applications link, and installs each deb on a matching Ubuntu runner before an offline screenshot test. Linux tests need `libxkbcommon-x11-0`, also declared as a deb runtime dependency. macOS uses ad-hoc signing, without Developer ID or notarization. Trial builds do not create a Release.
+The Windows exe, macOS universal2 DMG, and Linux amd64/arm64 debs are built, verified, and uploaded by [`.github/workflows/release.yml`](../.github/workflows/release.yml) on a tag push or manual release; the PC three-platform smoke checks also run there. macOS uses ad-hoc signing, without Developer ID or notarization.
 
 ### Automated release
 

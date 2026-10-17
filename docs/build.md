@@ -46,11 +46,11 @@ python3 scripts/package_desktop.py linux --binary target/release/sjturunningman 
 
 `APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 `qtui.py`、`main.spec` 和 `requirements.txt` 保留供迁移对照，计划在桌面端验收稳定后退役。
 
-### 桌面打包试运行
+### 桌面检查与发布构建
 
-`Native desktop checks`（`.github/workflows/desktop-check.yml`）在桌面代码 push / PR 时运行，也支持 Actions 页的 **Run workflow**。无需 tag 或安卓签名材料，构建当前分支的 Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb，并上传四份 `desktop-package-*` artifacts，每份包含安装文件、SHA256SUMS.txt 与提交/版本元数据。
+`Native desktop checks`（`.github/workflows/desktop-check.yml`）在桌面代码 push / PR 时运行，也支持 Actions 页的 **Run workflow**。它只在 Ubuntu 上执行 `cargo fmt`、`cargo clippy`、`cargo test` 和打包布局测试，不构建任何安装包，通常几分钟内结束。
 
-流程会校验 Windows 产品版本；挂载 DMG，检查双架构、应用签名完整性及 Applications 链接；在对应架构 Ubuntu runner 安装 deb 并运行离线截图测试。Linux 截图测试需要 `libxkbcommon-x11-0`；它同时被声明为 deb 运行依赖。macOS 为 ad-hoc 签名，不包含 Apple Developer ID 或公证。试运行不会创建 Release。
+Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb 的构建、打包验证与上传由 [`.github/workflows/release.yml`](../.github/workflows/release.yml) 在推送 tag 或手动发布时完成；PC 三平台 smoke 验证也在该流程中执行。macOS 为 ad-hoc 签名，不包含 Apple Developer ID 或公证。
 
 ### 自动发布流水线
 

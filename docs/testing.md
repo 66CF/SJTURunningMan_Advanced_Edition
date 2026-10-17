@@ -8,7 +8,7 @@
 | 电脑版 | ✅ 有 | Rust 单元测试、本地 HTTP mock、Slint 截图 smoke test |
 | iOS | ❌ 无 | 无测试 target |
 | 鸿蒙 | ❌ 无 | 目前只能手动验收（见下） |
-| CI | ✅ 桌面测试 | `desktop-check.yml` 三系统检查，桌面 release 作业先测试再打包 |
+| CI | ✅ 桌面测试 | `desktop-check.yml` 在 Ubuntu 跑 fmt / clippy / 单元测试；安装包构建与 smoke 只在 release 流程执行 |
 
 **补充测试是欢迎的** —— 新增测试的约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 

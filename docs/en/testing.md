@@ -8,7 +8,7 @@
 | Desktop | ✅ Yes | Rust unit tests, local HTTP mocks, Slint screenshot smoke tests |
 | iOS | ❌ None | No test target |
 | HarmonyOS | ❌ None | Manual acceptance only (see below) |
-| CI | ✅ Desktop tests | Three-OS `desktop-check.yml`; desktop release jobs test before packaging |
+| CI | ✅ Desktop tests | `desktop-check.yml` runs fmt / clippy / unit tests on Ubuntu; installers and smoke checks run only in the release workflow |
 
 **Additional tests are welcome** — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
