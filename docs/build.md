@@ -4,7 +4,7 @@
 
 | 平台 | 目录 | 工具链 | 产物 |
 | --- | --- | --- | --- |
-| 电脑版 | 仓库根 | Python + PyInstaller | `.exe` / `.dmg` / `.deb` |
+| 电脑版 | 仓库根 | Rust + Slint / Cargo | `.exe` / `.dmg` / `.deb` |
 | 安卓 | `apps/android/` | Gradle 9.4.1 + AGP 8.13.0 + Kotlin 2.2.10 | `.apk` / `.aab` |
 | iOS | `apps/ios/` | Xcode 16+ | `.ipa` |
 | 鸿蒙 | `apps/harmonyos/` | DevEco Studio / hvigor | `.hap` |
@@ -13,42 +13,44 @@
 
 ## 电脑版
 
-### 准备环境
+### 原生桌面构建
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+# 使用当前 stable Rust；Cargo.lock 固定全部依赖
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
+cargo build --release --locked
 ```
 
-### 直接运行
+Windows：安装 Rust 1.95+，并准备 MSVC Build Tools 或 MinGW-w64 工具链。运行 `./build_windows.ps1` → `dist/SJTURunningMan.exe`。`.cargo/config.toml` 为 MSVC 配置静态 CRT；本轮实际验证的是 GNU 工具链。
+
+macOS（需安装 Xcode Command Line Tools）：
 
 ```bash
-python qtui.py
+rustup target add x86_64-apple-darwin aarch64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target x86_64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target aarch64-apple-darwin
+mkdir -p dist
+lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
+python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 ```
 
-### 打包
-
-**Windows**
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build_windows.ps1
-```
-
-**全平台（等价命令）**
+Linux（Ubuntu 24.04，支持 X11 / Wayland）：
 
 ```bash
-python -m PyInstaller --clean --noconfirm ./main.spec
+sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
+cargo build --release --locked
+python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
+# ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`main.spec` 要点：
+`APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 `qtui.py`、`main.spec` 和 `requirements.txt` 保留供迁移对照，计划在桌面端验收稳定后退役。
 
-- 入口 `qtui.py`，`assets/` 整目录打进程序；
-- 图标 Windows 用 `assets/SJTURM.ico`，macOS 用 `assets/SJTURM.icns`；
-- macOS 产物是 `universal2` 架构（Intel + Apple Silicon 通用）；
-- 版本号从环境变量 `APP_VERSION` 注入，本地缺省 `4.5.0`。
+### 桌面检查与发布构建
 
-> ⚠️ 不要直接 `pyinstaller qtui.py` —— 那会丢失图标与 `assets/` 资源。
+`Native desktop checks`（`.github/workflows/desktop-check.yml`）在桌面代码 push / PR 时运行，也支持 Actions 页的 **Run workflow**。它只在 Ubuntu 上执行 `cargo fmt`、`cargo clippy`、`cargo test` 和打包布局测试，不构建任何安装包，通常几分钟内结束。
+
+Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb 的构建、打包验证与上传由 [`.github/workflows/release.yml`](../.github/workflows/release.yml) 在推送 tag 或手动发布时完成；PC 三平台 smoke 验证也在该流程中执行。macOS 为 ad-hoc 签名，不包含 Apple Developer ID 或公证。
 
 ### 自动发布流水线
 
@@ -63,7 +65,7 @@ python -m PyInstaller --clean --noconfirm ./main.spec
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest（自签名） |
 | `SHA256SUMS.txt` | release 作业汇总生成 |
 
-Python 版本固定 3.14.6。两个 deb 都构建在 Ubuntu 24.04 上 —— PySide6 的 aarch64 wheel 是 `manylinux_2_39`，要求 glibc ≥ 2.39，22.04 装不上。
+桌面使用 stable Rust（当前锁定依赖要求 Rust 1.95+）和 Cargo.lock。两个 deb 构建在 Ubuntu 24.04 上，声明 glibc ≥ 2.39。macOS 通过 lipo 合并两套 Rust 目标；Windows 内嵌现有图标。应用运行不需要 Python。
 
 > **iOS 与鸿蒙 NEXT 不在这个流水线里**，Releases 也不提供它们的预编译包，目前都只手工构建：
 >

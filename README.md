@@ -5,8 +5,8 @@
   <p><strong>轻量 · 实际路线预览 · 记录生成与上传流程研究</strong></p>
 
   <p>
-    <img alt="Python" src="https://img.shields.io/badge/Python-3.x-3776AB?logo=python&amp;logoColor=white" />
-    <img alt="PySide6" src="https://img.shields.io/badge/PySide6-Qt%20for%20Python-41CD52?logo=qt&amp;logoColor=white" />
+    <img alt="Rust" src="https://img.shields.io/badge/Rust-native-222222?logo=rust&amp;logoColor=white" />
+    <img alt="Slint" src="https://img.shields.io/badge/Slint-native%20UI-236849" />
     <img alt="Desktop" src="https://img.shields.io/badge/Desktop-v4.5.0-0078D4?logo=windows&amp;logoColor=white" />
     <img alt="Android" src="https://img.shields.io/badge/Android-v4.5.0-3DDC84?logo=android&amp;logoColor=white" />
     <img alt="iOS" src="https://img.shields.io/badge/iOS-v4.5.0-000000?logo=apple&amp;logoColor=white" />
@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <img alt="Route Preview" src="https://img.shields.io/badge/Route%20Preview-OpenStreetMap-D97706" />
+    <img alt="Route Preview" src="https://img.shields.io/badge/Route%20Preview-Baidu%20%2F%20OSM-D97706" />
     <img alt="Routes" src="https://img.shields.io/badge/Routes-Default%20%2B%20Import-2A6F97" />
   </p>
 </div>
@@ -34,12 +34,12 @@
 
 本项目仅用于学习、研究和技术测试，主要用于理解运动数据记录与上传相关的技术流程。项目作者不鼓励、不支持任何违反学校规定的使用方式。请在使用前确认自己的行为符合 SJTU 及相关平台的要求，请不要用于伪造运动数据或规避体育锻炼要求。
 
-电脑版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。程序默认以昨日作为结束日期，向前生成指定次数的跑步记录（默认 1 次），每次跑步 4 km，时间为 `08:00:00`。
+电脑版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。新版使用 Rust + Slint，运行时无需 Python、Qt 或 WebView。程序默认以昨日作为结束日期，向前生成指定次数的跑步记录（默认 1 次），每次跑步 4 km，时间为 `08:00:00`。
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/Sample_Dark.webp" />
-  <source media="(prefers-color-scheme: light)" srcset="assets/Sample_Bright.webp" />
-  <img alt="Windows 主界面预览" src="assets/Sample_Bright.webp" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/desktop-native-dark.webp" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/desktop-native-light.webp" />
+  <img alt="Windows 主界面预览" src="docs/images/desktop-native-light.webp" />
 </picture>
 
 ## 平台与文档
@@ -60,9 +60,9 @@
 
 | 模块 | 当前状态 |
 | --- | --- |
-| 电脑版图形界面 | PySide6 轻量桌面版，版本 `v4.5.0`，背景图 + 玻璃拟态主题 |
+| 电脑版图形界面 | Rust + Slint 原生桌面版，版本 `v4.5.0`，深浅色主题 + 离线轨迹预览 |
 | 路线预览 | 上传前离线预览（免登录）+ 上传中/后显示实际 payload 轨迹，>150 m 跳段红色高亮 |
-| 路线规划器 | 电脑版 Leaflet + OpenStreetMap；移动端百度地图 |
+| 路线规划器 | 电脑版百度地图（默认）/ OpenStreetMap 可切换；移动端百度地图 |
 | 路线选择 | 内置 `default.txt`，支持外部 txt 导入与持久化 |
 | 上传流程 | 两步式（取认证 → 生成并上传），支持多天、可中途停止 |
 | 移动端 | 安卓 `4.5.0`、iOS `4.5.0`、鸿蒙 `4.5.0`，功能对齐电脑版核心能力 |

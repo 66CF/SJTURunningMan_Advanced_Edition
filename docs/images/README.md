@@ -6,8 +6,10 @@
 
 | 文件 | 尺寸 | 内容 | 体积 |
 | --- | --- | --- | --- |
-| `desktop-main.webp` | 1000×686 | 电脑版主界面：用户配置区、上传设置区、路线预览框、日志区同时可见 | 37 KB |
-| `desktop-preview.webp` | 1000×633 | 电脑版「预览路线」在浏览器 OpenStreetMap 中打开的轨迹图，含起点/终点标记 | 77 KB |
+| `desktop-native-light.webp` | 1000×732 | Rust + Slint 电脑版浅色界面，含原图标与简洁品牌区 | 约 21 KB |
+| `desktop-native-dark.webp` | 1000×732 | Rust + Slint 电脑版深色界面，含原图标与简洁品牌区 | 约 21 KB |
+| `desktop-main.webp` | 1000×686 | 旧 Qt 电脑版主界面（历史对照，非当前界面） | 37 KB |
+| `desktop-preview.webp` | 1000×727 | Rust 电脑版「在地图中打开」的实际 OSM 轨迹图，含起点/终点标记与底图加载状态 | 约 56 KB |
 | `android-main.webp` | 480×1056 | 安卓主界面：参数配置卡片与「一键跑步」按钮 | 21 KB |
 | `android-route.webp` | 480×1056 | 安卓路线设计页：地图上已连点若干坐标 | 40 KB |
 | `ios-main.webp` | 480×974 | iOS 主界面：参数配置与运行日志 | 21 KB |
@@ -16,9 +18,9 @@
 | `macos-gatekeeper.webp` | 534×580 | macOS：首次打开被 Gatekeeper 拦截的弹窗 | 19 KB |
 | `macos-open-anyway.webp` | 1000×849 | macOS：系统设置 → 隐私与安全性 → 仍要打开 | 41 KB |
 
-全部为 WebP，本目录总计约 298 KB。
+全部为 WebP。Rust + Slint 截图由实际 Release 的 Slint window snapshot 生成，旧桌面截图保留作历史对照。
 
-前六张是各平台的**应用界面**截图（手机 480 px / 桌面 1000 px 宽）。后三张是 macOS 的**安装流程**截图，内容是系统弹窗与系统设置界面，按原始比例裁剪，未套用统一宽度。
+前八张是各平台的**应用界面**截图（手机 480 px / 桌面 1000 px 宽），其中 `desktop-main.webp` 是迁移前的旧 Qt 界面，仅作历史对照。后三张是 macOS 的**安装流程**截图，内容是系统弹窗与系统设置界面，按原始比例裁剪，未套用统一宽度。
 
 **尺寸约定**：手机端统一缩到 **480 px 宽**，桌面端 **1000 px 宽**。文档渲染时 GitHub 会把图片压到容器宽度（约 850 px）以内，再大的分辨率只是徒增仓库体积 —— 480 px 下字段名、按钮、日志文字仍然清晰可辨。
 

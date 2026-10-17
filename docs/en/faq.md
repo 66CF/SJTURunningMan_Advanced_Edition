@@ -31,27 +31,29 @@ A cookie is a credential. **Never share it**, and never paste it into issues, lo
 
 ## Desktop
 
-### Blocked by SmartScreen / Gatekeeper
+### SmartScreen / Gatekeeper blocks launch
 
-- Windows: "More info" → "Run anyway".
-- macOS: **System Settings → Privacy & Security** → "Open Anyway".
+For Windows, review the source and use More info → Run anyway if appropriate. For macOS installation, see [macos.md](macos.md).
 
-### Route preview doesn't open
+### Route preview does not open
 
-- The preview HTML is written to a temp directory and handed to your default browser. Make sure one is configured.
-- If security software blocks the temp directory, change it or temporarily disable the block.
+The in-app preview works offline. The map button opens a loopback-only HTTP page in the default browser, allowing OSM's required Referer. If an old map shows “403 / Access blocked”, close the old `file://` page and reopen it from the fixed client; reopen maps after restarting the client too. If loading still fails, check access to Leaflet/OSM. The page reports failures while retaining the track; see [desktop.md](desktop.md).
 
-### Packaged executable has no icon
+### Missing executable icon
 
-You ran `pyinstaller qtui.py` instead of `main.spec`. Use the spec per [build.md](./build.md#package).
+Build the native executable with `build_windows.ps1`; `desktop/build.rs` embeds the icon. Do not use the legacy PyInstaller command for the Rust client.
 
-### Imported routes vanish after restart
+### Imported routes disappeared after restarting
 
-Imported routes are copied into the `Routes/` folder **next to the executable**. If the app lives in a read-only location (e.g. `Program Files`), the write fails. Move it somewhere writable.
+Copies live in the OS user data directory’s `routes/`, independently of the installation directory. Check the active OS account and any reported data-directory errors. Legacy Routes/user.txt must be imported manually.
 
-### Selecting "Custom…" does nothing
+### Import does nothing or rejects the file
 
-You must pick a `.txt` route in the file dialog. Files that are not one `longitude,latitude` pair per line are rejected.
+Use Import TXT and select UTF-8 text with one BD09 longitude,latitude pair per line. Limits are 2 MB and 30,000 distinct consecutive points. Cancellation makes no changes. See [routes.md](routes.md).
+
+### How is the graphical CAPTCHA handled?
+
+Automatic recognition through the legacy service has been restored. Refresh to retry if recognition fails, or use the manual fallback. Login preserves the legacy delay after recognition and follows the server's returned redirect. Account login and My SJTU app verification have been checked live. When the school requires a six-digit second-factor code, the account holder still needs to receive and enter it.
 
 ---
 

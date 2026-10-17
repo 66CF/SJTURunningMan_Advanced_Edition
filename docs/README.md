@@ -37,13 +37,15 @@
 
 ```
 SJTURunningMan_Advanced_Edition/
-├── qtui.py                 电脑版 GUI 入口
-├── src/                    电脑版业务模块（api_client / data_generator / login / route_preview …）
+├── desktop/                Rust + Slint 电脑版（src/ 与 ui/）
+├── Cargo.toml              桌面 Cargo workspace（版本号在 desktop/Cargo.toml）
+├── qtui.py                 旧 Qt GUI 入口（迁移对照）
+├── src/                    旧 Python 模块；config.py 只对应旧客户端版本号
 ├── utils/                  通用工具
 ├── assets/                 图标、背景、内置路线（assets/Routes/）
-├── main.spec               PyInstaller 打包配置
+├── main.spec               旧 PyInstaller 配置（迁移对照）
 ├── build_windows.ps1       Windows 打包脚本
-├── route_planner.html      电脑版路线规划器（Leaflet + OpenStreetMap）
+├── route_planner.html      电脑版路线规划器（默认百度，可切 OpenStreetMap）
 ├── apps/
 │   ├── android/            安卓工程（Kotlin / Jetpack Compose）
 │   ├── ios/                iOS 工程（Swift / SwiftUI）

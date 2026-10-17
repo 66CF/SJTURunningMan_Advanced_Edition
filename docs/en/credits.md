@@ -11,14 +11,15 @@ This project stands on the work of its predecessors and many helpful contributor
 
 ## Contributors
 
-- [@CEQ151](https://github.com/CEQ151) — improved the desktop GUI and README
+- [@CEQ151](https://github.com/CEQ151) — improved the desktop GUI and README, and migrated the desktop client to Rust + Slint
 - [@AetherWish](https://github.com/AetherWish) — contributed the HarmonyOS source
 - [@tangyang0](https://github.com/tangyang0) — fixed a file-path bug on macOS
 - [@dajiaohuang](https://github.com/dajiaohuang) — fixed an undefined-variable bug
 
 ## Dependencies and assets
 
-- [PySide6 / Qt](https://www.qt.io/) — desktop GUI framework
+- [Rust](https://www.rust-lang.org/) + [Slint](https://slint.dev/) — desktop UI and runtime
+- [PySide6 / Qt](https://www.qt.io/) — legacy desktop UI (kept as a migration reference)
 - [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) — desktop route planner base map
 - [Baidu Maps](https://lbsyun.baidu.com/) — mobile route design base map
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) — Android UI

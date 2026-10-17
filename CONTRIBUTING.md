@@ -6,7 +6,7 @@
 
 | 平台 | 目录 | 语言 / 框架 |
 | --- | --- | --- |
-| 电脑版 | 仓库根（`qtui.py`、`src/`、`utils/`） | Python + PySide6 |
+| 电脑版 | `desktop/`（根 Cargo workspace） | Rust + Slint |
 | 安卓 | `apps/android/` | Kotlin + Jetpack Compose |
 | iOS | `apps/ios/` | Swift + SwiftUI |
 | 鸿蒙 | `apps/harmonyos/` | ArkTS |
@@ -20,10 +20,8 @@
 ### 电脑版
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python qtui.py
+cargo run --locked -p sjturunningman
+cargo test --workspace --locked
 ```
 
 ### 安卓
@@ -73,12 +71,13 @@ DevEco Studio，签名与 HAP 构建见 [docs/build.md](docs/build.md#鸿蒙)。
 
 | 平台 | 文件 | 字段 |
 | --- | --- | --- |
-| 电脑版 | `src/config.py` | `global_version` |
+| 电脑版 | `desktop/Cargo.toml` | `package.version` |
+| 电脑版（旧 Qt 客户端） | `src/config.py` | `global_version` |
 | 安卓 | `apps/android/app/build.gradle.kts` | `versionName` / `versionCode` |
 | iOS | `apps/ios/SJTURunningMan.xcodeproj/project.pbxproj` | `MARKETING_VERSION` |
 | 鸿蒙 | `apps/harmonyos/AppScope/app.json5` | `versionName` / `versionCode` |
 
-发版由维护者打 `v*` tag 触发 `release.yml`。**不要**在功能 PR 里顺手改版本号。
+发版由维护者打 `v*` tag 触发 `release.yml`；tag 必须与 `desktop/Cargo.toml` 的 `version` 一致，工作流会断言，不一致直接失败。**不要**在功能 PR 里顺手改版本号。
 
 ## 不要提交的东西
 

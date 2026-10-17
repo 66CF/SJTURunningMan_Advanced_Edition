@@ -1,7 +1,8 @@
 name: Python 检查
 
-# 只在电脑版（Python）相关文件变动时运行。
+# 只在旧版 Qt（Python）客户端相关文件变动时运行。
 # 文档、安卓、iOS、鸿蒙的改动不会触发这个工作流 —— 见同目录 ci-android.yml。
+# `build_windows.ps1` 已经是 Rust 构建脚本，由 desktop-check.yml 覆盖，不再算在这里。
 #
 # 背景：release.yml 只在推 v* tag 时运行，PR 上原本没有任何检查。
 
@@ -14,7 +15,6 @@ on:
       - 'assets/**'
       - 'requirements.txt'
       - 'main.spec'
-      - 'build_windows.ps1'
       - 'route_planner.html'
       - '.github/workflows/ci-python.yml'
   push:
@@ -26,7 +26,6 @@ on:
       - 'assets/**'
       - 'requirements.txt'
       - 'main.spec'
-      - 'build_windows.ps1'
       - 'route_planner.html'
       - '.github/workflows/ci-python.yml'
 

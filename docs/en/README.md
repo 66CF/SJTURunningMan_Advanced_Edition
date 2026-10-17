@@ -37,13 +37,15 @@ This directory is the English mirror of the project documentation. The root [REA
 
 ```
 SJTURunningMan_Advanced_Edition/
-├── qtui.py                 Desktop GUI entry point
-├── src/                    Desktop modules (api_client / data_generator / login / route_preview …)
+├── desktop/                Rust + Slint desktop (src/ and ui/)
+├── Cargo.toml              Desktop Cargo workspace (version lives in desktop/Cargo.toml)
+├── qtui.py                 Legacy Qt GUI reference
+├── src/                    Legacy Python modules; config.py only versions the legacy client
 ├── utils/                  Shared helpers
 ├── assets/                 Icons, backgrounds, built-in routes (assets/Routes/)
-├── main.spec               PyInstaller packaging config
+├── main.spec               Legacy PyInstaller config (migration reference)
 ├── build_windows.ps1       Windows packaging script
-├── route_planner.html      Desktop route planner (Leaflet + OpenStreetMap)
+├── route_planner.html      Desktop route planner (Baidu by default, OpenStreetMap optional)
 ├── apps/
 │   ├── android/            Android project (Kotlin / Jetpack Compose)
 │   ├── ios/                iOS project (Swift / SwiftUI)

@@ -11,14 +11,15 @@
 
 ## 贡献者
 
-- [@CEQ151](https://github.com/CEQ151) — 优化电脑版图形界面与 README
+- [@CEQ151](https://github.com/CEQ151) — 优化电脑版图形界面与 README，并将桌面端迁移到 Rust + Slint
 - [@AetherWish](https://github.com/AetherWish) — 贡献了鸿蒙版源码
 - [@tangyang0](https://github.com/tangyang0) — 修复了 macOS 上的文件路径 Bug
 - [@dajiaohuang](https://github.com/dajiaohuang) — 修复变量未定义 Bug
 
 ## 依赖与资源
 
-- [PySide6 / Qt](https://www.qt.io/) — 电脑版 GUI 框架
+- [Rust](https://www.rust-lang.org/) + [Slint](https://slint.dev/) — 电脑版界面与运行时
+- [PySide6 / Qt](https://www.qt.io/) — 旧版电脑版界面（保留作迁移对照）
 - [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) — 电脑版路线规划器底图
 - [百度地图](https://lbsyun.baidu.com/) — 移动端路线设计页底图
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) — 安卓界面

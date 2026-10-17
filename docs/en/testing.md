@@ -5,10 +5,10 @@
 | Platform | Automated tests | Notes |
 | --- | --- | --- |
 | Android | ✅ Yes | Unit + instrumented tests, below |
-| Desktop | ❌ None | Manual acceptance only |
+| Desktop | ✅ Yes | Rust unit tests, local HTTP mocks, Slint screenshot smoke tests |
 | iOS | ❌ None | No test target |
 | HarmonyOS | ❌ None | Manual acceptance only (see below) |
-| CI | ❌ No tests | `release.yml` only packages |
+| CI | ✅ Desktop tests | `desktop-check.yml` runs fmt / clippy / unit tests on Ubuntu; installers and smoke checks run only in the release workflow |
 
 **Additional tests are welcome** — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
@@ -50,46 +50,29 @@ Case: `app/src/androidTest/java/com/sjtu/runner/AppInstrumentedTest.kt`.
 
 ## Desktop manual checklist
 
-Walk through this before submitting any desktop change.
+Run `cargo test --workspace --locked`, `cargo fmt --all -- --check`, and `cargo clippy --workspace --all-targets --locked -- -D warnings`.
 
-**Startup**
+Run the Release executable with `--smoke-test target/smoke` to verify offline preview, invalid input, clearing logs, and opening a dropdown by mouse, selecting with arrow keys, confirming, and disabling it. It saves 28 screenshots: 16 combinations of four pages, two themes, and normal/minimum window sizes, plus consent, four modal types, progress/cross-page Stop, empty/long logs, wrapped notices, and dropdown interactions. It uses isolated local data, never logs in, and never uploads.
 
-- [ ] `python qtui.py` opens without a stack trace
-- [ ] The commitment dialog appears and blocks until accepted
-- [ ] Background and theme render correctly (no garbled text)
+For online maps, run `--map-smoke-test target/map-smoke`. Production UI callbacks prepare the default track and planner, writing `preview-url.txt` and `planner-url.txt` to that directory. Keep the test window running and open the URLs in a browser. Check tile HTTP 200, the actual loopback Referer, attribution, and TXT export. In an isolated browser, intercept tiles with HTTP 403: a failure message must appear while retaining the track, without retry loops. This mode never logs in or uploads. Closing the window stops the service; old URLs no longer reload.
 
-**Validation**
+- [ ] Commitment gates entry until checked; Exit closes the app.
+- [ ] Invalid runs, NaN/zero/excessive distance, malformed date/time are rejected.
+- [ ] Chinese text, light/dark appearance, Tab/Enter/Space, display scaling, and small-window scrolling work.
+- [ ] Default route, import, duplicate names, persistence, and copy-only deletion work; the source remains untouched.
+- [ ] Offline actual-track preview includes the legacy 200 m compensation; open routes reverse, closed routes loop; original gaps over 150 m are flagged.
+- [ ] Browser-map endpoints match the preview; planner-exported TXT can be imported.
+- [ ] With a valid account, automatic CAPTCHA recognition and app/email/SMS verification work, including refresh and manual fallback after recognition failure.
+- [ ] During an authorized live acceptance run, progress and outcomes are accurate; failed POST requests are not retried automatically.
+- [ ] Stop and close prevent further records; an in-flight HTTP request can take up to 15 seconds; the UI remains responsive.
+- [ ] Logout clears the session; preferences, logs, and screenshots contain no real credentials.
+- [ ] Updates are checked on demand; network failures are reported.
+- [ ] Windows exe has the expected icon/version, works away from assets, and requires no Python/Qt/MSYS2 DLLs.
+- [ ] macOS Intel/ARM targets combine into a universal app; DMG contains app and Applications link; validate on both architectures.
+- [ ] Chinese text is fully visible on macOS (navigation, form labels, log, full consent text), not just digits and Latin letters -- a failed font registration blanks all CJK, see [validation record](desktop-validation.md).
+- [ ] Linux amd64/arm64 debs install on matching Ubuntu 24.04 hosts; validate X11, Wayland, and file picker.
 
-- [ ] Count `0` or `31` is rejected
-- [ ] Time `8:00` (not `HH:MM:SS`) is rejected
-- [ ] Date `2026/05/07` is rejected
-- [ ] Distance `6` is rejected, `5` accepted
-
-**Routes**
-
-- [ ] The preset dropdown lists `default.txt`
-- [ ] "Custom…" imports a txt and it appears in the dropdown
-- [ ] Imported routes survive a restart
-- [ ] Scrolling over the dropdown does not switch routes
-- [ ] "Delete" removes imported routes but not `default.txt`
-
-**Preview**
-
-- [ ] "Preview route" works while **logged out**
-- [ ] The browser map shows the track, green start and red finish
-- [ ] A route with a > 150 m jump is highlighted red
-
-**Upload**
-
-- [ ] A 1-run, 2 km configuration completes successfully
-- [ ] "Stop" interrupts without freezing the UI
-- [ ] Logs stream per record, no uncaught exceptions
-
-**Packaging**
-
-- [ ] `python -m PyInstaller --clean --noconfirm ./main.spec` succeeds
-- [ ] The artifact has the correct icon (not the PyInstaller default)
-- [ ] The artifact launches and loads `assets/` correctly
+Windows checks do not replace macOS/Linux validation. Offline/local HTTP mock tests cannot establish live authentication, two-factor, or upload success.
 
 ---
 
