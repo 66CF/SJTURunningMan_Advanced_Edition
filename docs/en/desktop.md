@@ -8,6 +8,8 @@ Run the Windows exe, drag the macOS application into Applications, or install th
 
 The sidebar contains Workspace, Routes, Logs, and About. The interface currently uses Chinese labels. Switch light/dark appearance at the top right. Preferences and routes live in the OS user data directory, so the installation directory need not be writable. On the workspace, below the run-plan card, a read-only "本学期进度" (this semester's progress) card shows the current semester's qualifying distance and completion rate. Both show `--` until you log in, then refresh automatically.
 
+Results such as "二次验证成功", "登录成功" or "路线已导入" appear as a floating banner at the top of the workspace, stay for 5 seconds, then disappear without pushing the content below down; the same text always remains in the Logs page.
+
 The sidebar uses the original application icon and a clean sans-serif `RunningMan` wordmark, with a soft background marking the active navigation item. About retains the update check and provides GitHub and Shuiyuan discussion links with their icons, opening in the system browser.
 
 Inputs and dropdowns share compact rounded styling. The Logs page splits into two equal halves: a semester calendar on the left, listing this semester's run days week by week (solid green counts toward the score, outlined circles are invalid records, grey is a rest day), and the existing run log on the right. The log description sits below its title, separate from the Clear button. Empty logs show a placeholder; long logs scroll.

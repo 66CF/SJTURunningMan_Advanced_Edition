@@ -1249,7 +1249,8 @@ fn smoke_pages(weak: slint::Weak<AppWindow>, dir: PathBuf, index: usize) {
         23 => {
             ui.window().set_size(slint::LogicalSize::new(1040.0, 700.0));
             ui.set_log_text((0..40).map(|i| format!("[08:00:{:02}] 离线界面验证：这是用于检查长文本换行与滚动的测试日志，不会发起登录或上传请求。", i)).collect::<Vec<_>>().join("\n").into());
-            ui.set_notice("这是一条用于验证窄窗口自动换行的提示信息。请选择合适的路线，并检查距离、起终点和路线连续性后继续。测试长提示应完整显示，并且不能遮挡下方日志卡片或右侧操作按钮。".into());
+            // 提示条是浮在工作区之上的浮层：长文本要在窄窗口内完整换行，5 秒后自动收起。
+            ui.set_notice("这是一条用于验证窄窗口自动换行的提示信息。请选择合适的路线，并检查距离、起终点和路线连续性后继续。测试长提示应在浮层内完整换行，并在 5 秒后自动消失。".into());
         }
         24 => {
             ui.window().set_size(slint::LogicalSize::new(1120.0, 820.0));
@@ -1336,8 +1337,18 @@ fn smoke_pages(weak: slint::Weak<AppWindow>, dir: PathBuf, index: usize) {
             report["semester_stats_placeholder"] = true.into();
             report["semester_stats_fixture_rows"] = smoke_calendar_fixture().len().into();
             report["account_login_or_upload_attempted"] = false.into();
+            report["notice_auto_hide_seconds"] = 5.into();
             std::fs::write(path, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
-            let _ = slint::quit_event_loop();
+            // 提示条是浮层：写入 notice 后应立即显示，5 秒后自行收起，不把下方内容往下推。
+            ui.set_notice("提示条会在 5 秒后自动消失，不会占用下方空间".into());
+            assert!(ui.get_notice_shown(), "写入 notice 后提示条应立即显示");
+            slint::Timer::single_shot(Duration::from_millis(5_600), move || {
+                let Some(ui) = weak.upgrade() else {
+                    return;
+                };
+                assert!(!ui.get_notice_shown(), "提示条应在 5 秒后自动收起");
+                let _ = slint::quit_event_loop();
+            });
             return;
         }
     }

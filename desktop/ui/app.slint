@@ -275,6 +275,8 @@ export component AppWindow inherits Window {
     in property <int> progress: 0;
     in property <string> log-text;
     in property <string> notice;
+    // 提示条的可见状态：notice 一变就重新计时，5 秒后自动收起（浮层见文件末尾）。
+    out property <bool> notice-shown: false;
     in property <string> version;
     in property <string> update-status: "按需检查更新，启动时不请求网络。";
     in property <[CalendarRow]> calendar-rows;
@@ -287,6 +289,8 @@ export component AppWindow inherits Window {
     in-out property <bool> delete-open: false;
     in-out property <bool> upload-open: false;
     in-out property <int> two-factor-method: 0;
+    // 模态窗口（承诺书 / 登录 / 二次验证 / 删除路线 / 确认上传）是否打开。
+    property <bool> modal-open: root.consent-open || root.login-stage > 0 || root.delete-open || root.upload-open;
 
     callback preview;
     callback import-route;
@@ -345,11 +349,6 @@ export component AppWindow inherits Window {
                 Label { text: root.page == 0 ? "跑步工作台" : root.page == 1 ? "路线管理" : root.page == 2 ? "任务日志" : "关于软件"; font-size: 22px; font-weight: 600; vertical-alignment: center; horizontal-stretch: 1; }
                 Action { height: 34px; text: root.dark ? "◐ 浅色外观" : "◐ 深色外观"; clicked => { root.dark = !root.dark; } }
                 Action { height: 34px; text: root.logged-in ? "退出账号" : "登录账号"; enabled: !root.busy && !root.network-busy; clicked => { if root.logged-in { root.logout(); } else { root.prepare-login(); } } }
-            }
-
-            if root.notice != "": Rectangle {
-                height: Math.max(36px, notice-label.preferred-height + 16px); background: Theme.soft; border-radius: 8px;
-                notice-label := Text { x: 12px; y: 8px; width: parent.width - 24px; text: root.notice; color: Theme.accent; font-size: 12px; wrap: word-wrap; }
             }
 
             if root.page == 0 || root.page == 1: ScrollView {
@@ -620,7 +619,26 @@ export component AppWindow inherits Window {
         }
     }
 
-    if root.consent-open || root.login-stage > 0 || root.delete-open || root.upload-open: Rectangle {
+    // 提示条：浮在工作区之上，5 秒后自动消失，不再把下方内容往下推。
+    // 登录、二次验证等模态窗口内仍就地显示 notice，所以浮层只在没有模态时出现。
+    notice-timer := Timer {
+        interval: 5s;
+        running: root.notice-shown;
+        triggered() => { root.notice-shown = false; }
+    }
+    changed notice => {
+        root.notice-shown = root.notice != "";
+        if (root.notice-shown) { notice-timer.restart(); }
+    }
+    if root.notice-shown && !root.modal-open: Rectangle {
+        x: 228px; y: 66px; width: parent.width - 248px;
+        height: Math.max(36px, notice-label.preferred-height + 16px);
+        background: Theme.card; border-radius: 8px; border-width: 1px; border-color: Theme.accent;
+        clip: true;
+        notice-label := Text { x: 12px; y: 8px; width: parent.width - 24px; text: root.notice; color: Theme.accent; font-size: 12px; wrap: word-wrap; }
+    }
+
+    if root.modal-open: Rectangle {
         background: #0d211999;
         TouchArea { }
         Card {
