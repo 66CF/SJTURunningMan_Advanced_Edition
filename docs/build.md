@@ -56,7 +56,7 @@ python3 scripts/package_desktop.py linux --binary target/release/sjturunningman 
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 `src/`、`utils/` 和 `requirements.txt` 保留供迁移对照（旧 Qt 入口 `qtui.py` 与 `main.spec` 已移除），计划在验收稳定后退役。
+`APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 Python 模块、`requirements.txt` 与 PyInstaller 配置已全部移除，仓库里只剩 `scripts/` 下的打包脚本用到 Python。
 
 ### 桌面检查与发布构建
 

@@ -56,7 +56,7 @@ python3 scripts/package_desktop.py linux --binary target/release/sjturunningman 
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` takes `package.version` from `desktop/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The legacy `src/`, `utils/`, and `requirements.txt` remain for comparison (the old Qt entry point `qtui.py` and `main.spec` have been removed) and are slated for retirement once validation is stable.
+`APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` takes `package.version` from `desktop/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The legacy Python modules, `requirements.txt`, and the PyInstaller configuration have all been removed; only the packaging scripts under `scripts/` still use Python.
 
 ### Desktop checks and release builds
 

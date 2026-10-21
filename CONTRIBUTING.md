@@ -78,8 +78,6 @@ DevEco Studio，签名与 HAP 构建见 [docs/build.md](docs/build.md#鸿蒙)。
 
 发版由维护者打 `v*` tag 触发 `release.yml`；tag 必须与 `desktop/Cargo.toml` 的 `version` 一致，工作流会断言，不一致直接失败。**不要**在功能 PR 里顺手改版本号。
 
-保留的旧 Python 模块 `src/config.py` 里的 `global_version` 不随发布产物，也不参与发版 tag 校验。
-
 ## 不要提交的东西
 
 `AGENTS.md` 与 `.gitignore` 已覆盖，这里再列一遍最常犯的：

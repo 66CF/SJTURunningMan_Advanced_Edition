@@ -1,6 +1,6 @@
 # 电脑版（Windows / macOS / Linux）
 
-电脑版使用 **Rust + Slint** 原生界面，主入口是 `desktop/src/main.rs`。不依赖 Python、Qt 或 WebView；路线与规划器资源编译进可执行文件。旧版 Python 模块 `src/` 与 `utils/` 保留供迁移对照（旧 Qt 入口 `qtui.py` 已移除），默认构建和发布使用 Rust。
+电脑版使用 **Rust + Slint** 原生界面，主入口是 `desktop/src/main.rs`。不依赖 Python、Qt 或 WebView；路线与规划器资源编译进可执行文件。旧版 Python 模块与 Qt 入口已全部移除，构建和发布只产出 Rust 客户端。
 
 ## 启动与使用
 

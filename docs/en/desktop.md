@@ -1,6 +1,6 @@
 # Desktop (Windows / macOS / Linux)
 
-The desktop client now uses **Rust + Slint**, with `desktop/src/main.rs` as its entry point. It needs no Python, Qt, or WebView. Routes and the planner are embedded in the executable. The legacy Python modules `src/` and `utils/` remain as migration references (the old Qt entry point `qtui.py` has been removed); default builds and releases use Rust.
+The desktop client now uses **Rust + Slint**, with `desktop/src/main.rs` as its entry point. It needs no Python, Qt, or WebView. Routes and the planner are embedded in the executable. The legacy Python modules and the Qt entry point have been removed entirely; builds and releases produce the Rust client only.
 
 ## Using the client
 
