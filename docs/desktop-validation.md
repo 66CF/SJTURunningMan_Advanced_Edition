@@ -34,7 +34,7 @@
 - 登录保留旧版自动识别图形验证码；识别服务异常时才显示手动备用输入。
 - 保留旧客户端坐标校准、固定 200 m 距离补偿、开始时间波动及 payload 字段；采样器重新实现，并保留拐点避免距离缩短。
 - 长于目标的路线自动截取；旧 Qt 的「沿完整路线」选择不再出现。实际生成长度会显示在预览中。
-- 旧路线需通过「导入 TXT」迁移到用户数据目录；旧 Qt 源码和真实依赖 `assets/resources_rc.py` 均保留。
+- 旧路线需通过「导入 TXT」迁移到用户数据目录；旧 Python 模块 `src/`、`utils/` 和真实依赖 `assets/resources_rc.py` 仍保留（旧 Qt 入口已移除）。
 
 ## 验证码回归修复
 
@@ -100,3 +100,14 @@
 - 百度 loader 带 `referrerpolicy="no-referrer"`，页面本身仍保留 `strict-origin-when-cross-origin` 供 OSM 使用。
 
 尚未验收：Windows / Linux 真机上的百度与 OSM 渲染、Baidu AK 的其他网络环境、真实上传。`--map-smoke-test` 只证明页面可启动与坐标契约，地图渲染由上述浏览器检查覆盖。
+
+## 学期统计与学期日历（2026-10-21）
+
+工作台新增只读「本学期进度」卡片（达标公里、完成率），「任务日志」改为左侧学期日历 + 右侧运行日志。改动只在 `desktop/`，移动端与旧 Python 模块未变。
+
+- 统计由五条固定顺序的只读请求组成：`GET /sports/my/data` → `GET /sports/my/semesterTarget` → `GET /sports/running/semester/list?type=1` → `POST /sports/ranking/getUserInfo`（空 JSON body）→ `GET /sports/running/result/list?selectId=<semesterId>&type=1`。这些接口只需要 `pe.sjtu.edu.cn` 的会话 Cookie，不需要 `/sports/my/uid` 换取的 token。跳转到 `/login`、返回非 JSON、或 `code != 0` 一律识别为「登录状态已过期」，错误信息只带受控分类，不带响应正文。学期列表缺少 `semesterId` 时直接失败，不再请求记录列表。
+- 纯逻辑放在新模块 `desktop/src/stats.rs`：学期区间防御（`end < start` 或跨度超过 400 天返回空）、周一起始的按月日历网格、月首尾空白格、同日多记录时「计入成绩」优先于无效记录、`--` 与一位小数的百分比格式化。网络解析在 `Session::semester_stats`。界面用扁平行模型加 7 个显式 `DayCell`，避开 Slint 在重复行内再嵌 `if` / `for` 的限制。
+- 刷新时机：登录成功、二次验证成功、任务有成功上传之后。每次登录或刷新递增会话序号，换账号或退出登录后到达的迟到响应直接丢弃；同步失败只写一行日志，登录状态不变。
+- 自动化：`cargo test --workspace --locked` 为 44 项通过、1 项真实验证码测试忽略（另有 2 项二进制测试），新增覆盖请求顺序、登录重定向、`code != 0`、缺失 `semesterId`、同日有效+无效、缺失 `percent` 时的推导，以及日历跨月/跨年、补齐空白格、区间外日期与占位区间。`cargo fmt --all -- --check` 与 `cargo clippy --workspace --all-targets --locked -- -D warnings` 在 Rust 1.99.1 下干净。
+- `--smoke-test` 新增两个确定性夹具：已登录状态下的首页统计数值，以及固定学期范围（2026-09-14 起）的日历，含计入成绩、无效记录与落在区间外的日期。截图从 28 张增加到 30 张，`snapshot_count` 改为按输出目录内实际 PNG 数量推导，不再沿用硬编码值；报告另记 `semester_stats_placeholder` 与 `semester_stats_fixture_rows`。本次构建的像素统计（浅色主题、1493×1093 窗口、日历配色每通道容差 ±3、强调色 ±6）确认第 30 张截图同时出现三种日历配色：计入成绩 2609 px、无效记录 548 px、未跑 33787 px；第 29 张首页截图的强调色 `#236849` 共 14741 px、左半区 4232 px，而占位截图 `02-screen.png` 为 10611 px、左半区仅 134 px，说明统计卡片确实渲染了夹具数值。夹具数值与日期均为本地常量，测试不登录、不上传。
+- 尚未验证：真实账号登录后的达标公里与完成率数值、无效记录在真实数据下的颜色与日期归属、macOS / Linux 真机上卡片与两栏布局的视觉表现，以及 1040×700 最小窗口下两栏是否溢出。上一节的 28 张截图记录属于此前的构建，保持不变。

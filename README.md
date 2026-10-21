@@ -75,6 +75,18 @@
 - **iOS** —— 不提供预编译包，需自行用 Xcode 编译，见 [docs/ios.md](docs/ios.md)；
 - **鸿蒙 NEXT** —— 不提供预编译包，需自行用 DevEco Studio 编译并签名，见 [docs/harmonyos.md](docs/harmonyos.md)。
 
+## 从源码运行
+
+电脑版是 Rust + Slint 原生程序，克隆仓库后一条命令即可运行，不需要安装包，也不需要 Python 或 Qt：
+
+```bash
+git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
+cd SJTURunningMan_Advanced_Edition
+cargo run --locked -p sjturunningman
+```
+
+需要 Rust 1.95+（用 `rustup` 安装 stable）和本机的 C/C++ 链接工具链；Linux 还要装 `pkg-config`、`libfontconfig1-dev`、`libxkbcommon-dev` 等依赖。各平台的完整步骤、测试与打包命令见 [docs/build.md](docs/build.md)。
+
 ## 文档导航
 
 | 主题 | 文档 |

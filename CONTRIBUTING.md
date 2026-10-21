@@ -72,12 +72,13 @@ DevEco Studio，签名与 HAP 构建见 [docs/build.md](docs/build.md#鸿蒙)。
 | 平台 | 文件 | 字段 |
 | --- | --- | --- |
 | 电脑版 | `desktop/Cargo.toml` | `package.version` |
-| 电脑版（旧 Qt 客户端） | `src/config.py` | `global_version` |
 | 安卓 | `apps/android/app/build.gradle.kts` | `versionName` / `versionCode` |
 | iOS | `apps/ios/SJTURunningMan.xcodeproj/project.pbxproj` | `MARKETING_VERSION` |
 | 鸿蒙 | `apps/harmonyos/AppScope/app.json5` | `versionName` / `versionCode` |
 
 发版由维护者打 `v*` tag 触发 `release.yml`；tag 必须与 `desktop/Cargo.toml` 的 `version` 一致，工作流会断言，不一致直接失败。**不要**在功能 PR 里顺手改版本号。
+
+保留的旧 Python 模块 `src/config.py` 里的 `global_version` 不随发布产物，也不参与发版 tag 校验。
 
 ## 不要提交的东西
 

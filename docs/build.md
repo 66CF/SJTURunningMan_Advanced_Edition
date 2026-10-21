@@ -13,6 +13,18 @@
 
 ## 电脑版
 
+### 直接运行源码
+
+只想把电脑版跑起来，不需要制作安装包：
+
+```bash
+git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
+cd SJTURunningMan_Advanced_Edition
+cargo run --locked -p sjturunningman
+```
+
+需要 Rust 1.95+（用 `rustup` 安装 stable 即可）和本机的 C/C++ 链接工具链；运行电脑版不需要 Python、Qt 或 WebView。各系统的额外依赖见下一节。首次启动仍需阅读并勾选使用承诺书。
+
 ### 原生桌面构建
 
 ```bash
@@ -44,7 +56,7 @@ python3 scripts/package_desktop.py linux --binary target/release/sjturunningman 
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 `qtui.py`、`main.spec` 和 `requirements.txt` 保留供迁移对照，计划在桌面端验收稳定后退役。
+`APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 `src/`、`utils/` 和 `requirements.txt` 保留供迁移对照（旧 Qt 入口 `qtui.py` 与 `main.spec` 已移除），计划在验收稳定后退役。
 
 ### 桌面检查与发布构建
 

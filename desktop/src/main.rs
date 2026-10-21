@@ -10,12 +10,14 @@ use sjturunningman::{
     maps::MapServer,
     route::{self, Route},
     settings::{self, RunConfig, Settings},
+    stats::{self, DayState},
     task::{self, Event, Preview},
     update,
 };
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::{
     cell::RefCell,
+    collections::HashSet,
     path::{Path, PathBuf},
     rc::Rc,
     sync::{
@@ -35,6 +37,8 @@ enum AppEvent {
     Update(Result<String, String>),
     Task(Event),
     TaskError(String),
+    /// 后台线程取回的学期统计；u64 是发起时的会话序号，用来丢弃过期账号的迟到响应。
+    Stats(u64, Result<stats::SemesterStats, String>),
 }
 
 struct PreparedLogin {
@@ -80,12 +84,121 @@ struct State {
     cancel: Arc<AtomicBool>,
     close_after_stop: bool,
     verification_attempts: u8,
+    /// 每次登录或退出都递增，晚到的学期响应只有序号匹配才允许写界面。
+    session_serial: u64,
+    /// 最近一次同步到的学期统计：已有记录的日期、学期起止、目标与已完成公里数。
+    stats: Option<stats::SemesterStats>,
+    /// 客户端自动填进输入框的（次数, 距离），用来分辨「用户手改过」。
+    auto_plan: Option<(String, String)>,
+    /// 只在登录 / 二次验证之后的那次学期响应里自动排计划，上传后的刷新不重排。
+    auto_adjust_pending: bool,
 }
 
 fn dispatch(sender: &mpsc::Sender<AppEvent>, ui: &slint::Weak<AppWindow>, event: AppEvent) {
     if sender.send(event).is_ok() {
         let _ = ui.upgrade_in_event_loop(|ui| ui.invoke_receive_events());
     }
+}
+
+/// 日历状态编码给 Slint：0 未跑、1 计入成绩、2 无效记录。
+fn day_state_code(state: &DayState) -> i32 {
+    match state {
+        DayState::None => 0,
+        DayState::Valid => 1,
+        DayState::Invalid => 2,
+    }
+}
+
+/// 日历按扁平行模型传给界面，避免在重复元素里再嵌 if/for。
+fn calendar_model(weeks: &[stats::CalendarWeek]) -> ModelRc<CalendarRow> {
+    ModelRc::new(VecModel::from(
+        weeks
+            .iter()
+            .map(|week| {
+                let day = |index: usize| i32::from(week.days[index].day);
+                let state = |index: usize| day_state_code(&week.days[index].state);
+                CalendarRow {
+                    title: week.title.clone().into(),
+                    d0: day(0),
+                    d1: day(1),
+                    d2: day(2),
+                    d3: day(3),
+                    d4: day(4),
+                    d5: day(5),
+                    d6: day(6),
+                    s0: state(0),
+                    s1: state(1),
+                    s2: state(2),
+                    s3: state(3),
+                    s4: state(4),
+                    s5: state(5),
+                    s6: state(6),
+                }
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+/// 未登录时的占位日历：按本地日期猜一个学期区间，全部格子都是「未跑」。
+fn placeholder_calendar() -> ModelRc<CalendarRow> {
+    calendar_model(&stats::placeholder_weeks(stats::today_cst()))
+}
+
+/// 后台线程只做网络，结果一律回到事件循环里再碰界面。
+fn spawn_stats_refresh(
+    session: Session,
+    serial: u64,
+    sender: &mpsc::Sender<AppEvent>,
+    weak: &slint::Weak<AppWindow>,
+) {
+    let tx = sender.clone();
+    let weak = weak.clone();
+    std::thread::spawn(move || {
+        dispatch(
+            &tx,
+            &weak,
+            AppEvent::Stats(serial, session.semester_stats()),
+        );
+    });
+}
+
+/// 登录后的第一次学期数据用来按本学期缺口反推「次数 × 单次距离」。
+/// 用户已经手动改过默认值就不插手，只在日志里说明为什么没调整。
+fn auto_adjust_plan(ui: &AppWindow, state: &mut State, data: &stats::SemesterStats) {
+    let (Some(target), Some(done)) = (data.target_km, data.result_km) else {
+        log(ui, "服务器未返回本学期目标或已完成公里数，跑步计划保持不变");
+        return;
+    };
+    let remaining = target - done;
+    let Some(plan) = stats::auto_plan(remaining) else {
+        log(ui, "本学期没有待补的公里数，跑步计划保持不变");
+        return;
+    };
+    let current = (ui.get_runs().to_string(), ui.get_distance().to_string());
+    let defaults = Settings::default();
+    let untouched = current == (defaults.runs, defaults.distance);
+    let last_plan = state.auto_plan.clone();
+    if !untouched && last_plan.as_ref() != Some(&current) {
+        log(ui, "跑步次数 / 单次距离已被手动修改，保持你的设置");
+        return;
+    }
+    let runs = plan.runs.to_string();
+    let distance = stats::format_plan_km(plan.distance_km);
+    ui.set_runs(runs.clone().into());
+    ui.set_distance(distance.clone().into());
+    state.auto_plan = Some((runs, distance.clone()));
+    // 次数和距离都变了，上一条预览不再对应当前参数。
+    state.preview = None;
+    state.preview_inputs = None;
+    notify(
+        ui,
+        format!(
+            "已按本学期未完成 {} 自动设为 {} 次 × {} km",
+            stats::format_km(Some(remaining)),
+            plan.runs,
+            distance
+        ),
+    );
 }
 
 /// 系统里可能带 CJK 字形的字体文件，(家族名, 路径)，按优先级排列。
@@ -364,9 +477,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.set_dark(prefs.dark);
     ui.set_runs(prefs.runs.clone().into());
     ui.set_distance(prefs.distance.clone().into());
+    ui.set_skip_existing(prefs.skip_existing);
     ui.set_run_time(prefs.time.clone().into());
     ui.set_run_date(settings::yesterday().into());
     ui.set_version(format!("v{}", env!("APP_VERSION")).into());
+    // 上次是客户端自动填的计划就继续当作「没手改过」，用户自己改过的不会被动覆盖。
+    let auto_plan = if prefs.plan_auto {
+        Some((prefs.runs.clone(), prefs.distance.clone()))
+    } else {
+        None
+    };
     let state = Rc::new(RefCell::new(State {
         dir,
         maps: None,
@@ -381,6 +501,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cancel: Arc::new(AtomicBool::new(false)),
         close_after_stop: false,
         verification_attempts: 0,
+        session_serial: 0,
+        stats: None,
+        auto_plan,
+        auto_adjust_pending: false,
     }));
     if let Err(error) = reload_routes(&ui, &mut state.borrow_mut(), &prefs.route) {
         notify(&ui, error);
@@ -396,10 +520,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(warning) = warning {
         notify(&ui, warning);
     }
+    ui.set_calendar_rows(placeholder_calendar());
     let (sender, receiver) = mpsc::channel();
 
     let weak = ui.as_weak();
     let shared = state.clone();
+    let tx = sender.clone();
     ui.on_receive_events(move || {
         let Some(ui) = weak.upgrade() else {
             return;
@@ -440,6 +566,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ui.set_logged_in(true);
                             ui.set_login_stage(0);
                             notify(&ui, "登录成功，会话仅保留在内存中");
+                            state.auto_adjust_pending = true;
+                            state.session_serial += 1;
+                            if let Some(session) = state.session.clone() {
+                                spawn_stats_refresh(session, state.session_serial, &tx, &weak);
+                            }
                         }
                         Ok(LoginResult::TwoFactor(session)) => {
                             state.two_factor = Some(session);
@@ -469,6 +600,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ui.set_login_stage(0);
                             ui.set_two_factor_code("".into());
                             notify(&ui, "二次验证成功");
+                            state.auto_adjust_pending = true;
+                            state.session_serial += 1;
+                            if let Some(session) = state.session.clone() {
+                                spawn_stats_refresh(session, state.session_serial, &tx, &weak);
+                            }
                         }
                         Err(e) => {
                             state.verification_attempts += 1;
@@ -532,6 +668,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .into(),
                         );
                         log(&ui, &ui.get_status());
+                        // 上传成功之后当天才算得上数，顺手刷新一次日历。
+                        if success > 0 && state.session.is_some() {
+                            state.session_serial += 1;
+                            if let Some(session) = state.session.clone() {
+                                spawn_stats_refresh(session, state.session_serial, &tx, &weak);
+                            }
+                        }
                         if state.close_after_stop {
                             let _ = slint::quit_event_loop();
                         }
@@ -544,6 +687,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     notify(&ui, error);
                     if state.close_after_stop {
                         let _ = slint::quit_event_loop();
+                    }
+                }
+                AppEvent::Stats(serial, result) => {
+                    // 换过账号或已经退出之后的迟到响应直接丢掉。
+                    if serial != state.session_serial || state.session.is_none() {
+                        continue;
+                    }
+                    match result {
+                        Ok(data) => {
+                            let adjust = state.auto_adjust_pending;
+                            state.auto_adjust_pending = false;
+                            state.stats = Some(data.clone());
+                            ui.set_semester_km(stats::format_km(data.result_km).into());
+                            ui.set_semester_percent(stats::format_percent(data.percent).into());
+                            match data.range {
+                                Some(range) => {
+                                    let weeks = stats::calendar_weeks(range, &data.run_days);
+                                    ui.set_calendar_rows(calendar_model(&weeks));
+                                    log(
+                                        &ui,
+                                        &format!("学期数据已同步 · {} 天有记录", data.run_days.len()),
+                                    );
+                                }
+                                None => log(&ui, "服务器未返回本学期起止日期，日历保持占位"),
+                            }
+                            if adjust {
+                                auto_adjust_plan(&ui, &mut state, &data);
+                            }
+                        }
+                        Err(error) => {
+                            state.auto_adjust_pending = false;
+                            log(&ui, &format!("学期数据同步失败：{error}"));
+                        }
                     }
                 }
             }
@@ -821,8 +997,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             state.challenge = None;
             state.two_factor = None;
             state.user.clear();
+            state.session_serial += 1;
+            state.stats = None;
+            state.auto_adjust_pending = false;
             ui.set_username("".into());
             ui.set_logged_in(false);
+            ui.set_semester_km("--".into());
+            ui.set_semester_percent("--".into());
+            ui.set_calendar_rows(placeholder_calendar());
             refresh_route(&ui, &mut state);
             notify(&ui, "已退出账号，内存会话已清除");
         }
@@ -857,6 +1039,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return;
             }
         };
+        let occupied = state
+            .stats
+            .as_ref()
+            .map(|data| data.run_days.keys().copied().collect::<HashSet<_>>())
+            .unwrap_or_default();
+        let earliest = state
+            .stats
+            .as_ref()
+            .and_then(|data| data.range)
+            .map(|range| range.start);
+        let plan = match task::schedule(&config, ui.get_skip_existing(), &occupied, earliest) {
+            Ok(plan) => plan,
+            Err(error) => {
+                notify(&ui, error);
+                return;
+            }
+        };
+        if plan.dates.is_empty() {
+            notify(
+                &ui,
+                "设定次数内的日期都已有记录，可关闭「跳过已有记录的日期」或改用更早的结束日期",
+            );
+            return;
+        }
         state.cancel = Arc::new(AtomicBool::new(false));
         let cancel = state.cancel.clone();
         let user = state.user.clone();
@@ -867,9 +1073,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let tx = tx.clone();
         let weak = weak.clone();
         std::thread::spawn(move || {
-            if let Err(e) = task::run(&session, &route.points, &config, &user, &cancel, |event| {
-                dispatch(&tx, &weak, AppEvent::Task(event))
-            }) {
+            if let Err(e) = task::run(
+                &session,
+                &route.points,
+                &config,
+                &plan,
+                &user,
+                &cancel,
+                |event| dispatch(&tx, &weak, AppEvent::Task(event)),
+            ) {
                 dispatch(&tx, &weak, AppEvent::TaskError(e));
             }
         });
@@ -971,6 +1183,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             route: selected(&state, &ui)
                 .map(|r| r.name)
                 .unwrap_or_else(|_| "default".into()),
+            skip_existing: ui.get_skip_existing(),
+            plan_auto: state.auto_plan.as_ref()
+                == Some(&(ui.get_runs().to_string(), ui.get_distance().to_string())),
         };
         if let Err(error) = settings::save(&state.dir, &settings) {
             eprintln!("{error}");
@@ -1054,6 +1269,38 @@ fn smoke_test(
     Ok(())
 }
 
+/// 离线验收用的固定日历夹具：不读网络、不依赖本机日期，保证截图可复现。
+/// 覆盖跨月、月首补齐空白格、有效记录与无效记录三种状态。
+fn smoke_calendar_fixture() -> Vec<stats::CalendarWeek> {
+    let start = chrono::NaiveDate::from_ymd_opt(2026, 9, 14).expect("夹具日期有效");
+    let end = chrono::NaiveDate::from_ymd_opt(2026, 10, 31).expect("夹具日期有效");
+    let range = stats::SemesterRange::new(start, end).expect("夹具区间有效");
+    let mut run_days = std::collections::HashMap::new();
+    for (day, state) in [
+        (14, DayState::Valid),
+        (19, DayState::Valid),
+        (20, DayState::Invalid),
+        (27, DayState::Valid),
+    ] {
+        stats::record_day(
+            &mut run_days,
+            chrono::NaiveDate::from_ymd_opt(2026, 9, day).expect("夹具日期有效"),
+            state,
+        );
+    }
+    stats::record_day(
+        &mut run_days,
+        chrono::NaiveDate::from_ymd_opt(2026, 10, 12).expect("夹具日期有效"),
+        DayState::Valid,
+    );
+    stats::record_day(
+        &mut run_days,
+        chrono::NaiveDate::from_ymd_opt(2026, 8, 30).expect("夹具日期有效"),
+        DayState::Valid,
+    );
+    stats::calendar_weeks(range, &run_days)
+}
+
 fn smoke_pages(weak: slint::Weak<AppWindow>, dir: PathBuf, index: usize) {
     use slint::platform::{Key, PointerEventButton, WindowEvent};
     let Some(ui) = weak.upgrade() else {
@@ -1104,7 +1351,8 @@ fn smoke_pages(weak: slint::Weak<AppWindow>, dir: PathBuf, index: usize) {
         23 => {
             ui.window().set_size(slint::LogicalSize::new(1040.0, 700.0));
             ui.set_log_text((0..40).map(|i| format!("[08:00:{:02}] 离线界面验证：这是用于检查长文本换行与滚动的测试日志，不会发起登录或上传请求。", i)).collect::<Vec<_>>().join("\n").into());
-            ui.set_notice("这是一条用于验证窄窗口自动换行的提示信息。请选择合适的路线，并检查距离、起终点和路线连续性后继续。测试长提示应完整显示，并且不能遮挡下方日志卡片或右侧操作按钮。".into());
+            // 提示条是浮在工作区之上的浮层：长文本要在窄窗口内完整换行，5 秒后自动收起。
+            ui.set_notice("这是一条用于验证窄窗口自动换行的提示信息。请选择合适的路线，并检查距离、起终点和路线连续性后继续。测试长提示应在浮层内完整换行，并在 5 秒后自动消失。".into());
         }
         24 => {
             ui.window().set_size(slint::LogicalSize::new(1120.0, 820.0));
@@ -1155,17 +1403,54 @@ fn smoke_pages(weak: slint::Weak<AppWindow>, dir: PathBuf, index: usize) {
             );
             ui.set_network_busy(false);
         }
+        27 => {
+            // 首页统计卡片：关掉所有模态后写入固定夹具数值，不发起任何请求。
+            ui.set_login_stage(0);
+            ui.set_upload_open(false);
+            ui.set_delete_open(false);
+            ui.set_busy(false);
+            ui.set_network_busy(false);
+            ui.set_logged_in(true);
+            ui.set_semester_km("80.00 km".into());
+            ui.set_semester_percent("100.0%".into());
+            ui.set_calendar_rows(calendar_model(&smoke_calendar_fixture()));
+            ui.set_page(0);
+        }
+        28 => {
+            // 任务日志页：左侧学期日历夹具 + 右侧既有日志。
+            ui.set_page(2);
+        }
         _ => {
             let path = dir.join("smoke-result.json");
             let mut report: serde_json::Value =
                 serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            let snapshot_count = std::fs::read_dir(&dir)
+                .map(|entries| {
+                    entries
+                        .filter_map(|entry| entry.ok())
+                        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "png"))
+                        .count()
+                })
+                .unwrap_or(0);
             report["page_theme_size_combinations"] = 16.into();
-            report["snapshot_count"] = 28.into();
+            report["snapshot_count"] = snapshot_count.into();
             report["select_mouse_keyboard_disabled"] = true.into();
             report["clear_log"] = true.into();
+            report["semester_stats_placeholder"] = true.into();
+            report["semester_stats_fixture_rows"] = smoke_calendar_fixture().len().into();
             report["account_login_or_upload_attempted"] = false.into();
+            report["notice_auto_hide_seconds"] = 5.into();
             std::fs::write(path, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
-            let _ = slint::quit_event_loop();
+            // 提示条是浮层：写入 notice 后应立即显示，5 秒后自行收起，不把下方内容往下推。
+            ui.set_notice("提示条会在 5 秒后自动消失，不会占用下方空间".into());
+            assert!(ui.get_notice_shown(), "写入 notice 后提示条应立即显示");
+            slint::Timer::single_shot(Duration::from_millis(5_600), move || {
+                let Some(ui) = weak.upgrade() else {
+                    return;
+                };
+                assert!(!ui.get_notice_shown(), "提示条应在 5 秒后自动收起");
+                let _ = slint::quit_event_loop();
+            });
             return;
         }
     }

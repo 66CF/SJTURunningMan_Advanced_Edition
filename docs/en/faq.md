@@ -41,7 +41,7 @@ The in-app preview works offline. The map button opens a loopback-only HTTP page
 
 ### Missing executable icon
 
-Build the native executable with `build_windows.ps1`; `desktop/build.rs` embeds the icon. Do not use the legacy PyInstaller command for the Rust client.
+Build the native executable with `build_windows.ps1`; `desktop/build.rs` embeds the icon. The repository no longer ships a PyInstaller spec, so the legacy packaging command cannot build the Rust client either.
 
 ### Imported routes disappeared after restarting
 

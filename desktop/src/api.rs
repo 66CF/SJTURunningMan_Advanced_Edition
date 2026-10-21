@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use regex::Regex;
 use reqwest::{
     blocking::{Client, Response},
@@ -329,6 +330,98 @@ impl Session {
         Ok((token, rules["data"].clone()))
     }
 
+    /// 只读学期统计：达标公里、完成率与本学期打卡日期。
+    /// 这些接口只要 pe.sjtu.edu.cn 的会话 Cookie，不需要 `/sports/my/uid` 换的 token。
+    /// 其中学期目标与学期起止日期失败时不阻塞其余数据。
+    pub fn semester_stats(&self) -> Result<crate::stats::SemesterStats, String> {
+        let data = self.get_json("/sports/my/data", &[], "学期统计")?;
+        let summary = &data["data"][0];
+        let result_km = json_number(summary.get("resultKm"));
+        let total_km = json_number(summary.get("totalKm"));
+        let percent = json_number(summary.get("percent"))
+            .or_else(|| crate::stats::percent_from_ratio(result_km, total_km));
+        let target_km = self
+            .get_json("/sports/my/semesterTarget", &[], "学期目标")
+            .ok()
+            .and_then(|value| json_number(value["data"].get("target")));
+
+        let semester = self.get_json(
+            "/sports/running/semester/list",
+            &[("type", "1")],
+            "学期列表",
+        )?;
+        let entry = &semester["data"][0];
+        let semester_id = entry["semesterId"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .ok_or("学期列表缺少 semesterId")?;
+        let semester_name = entry["semesterName"]
+            .as_str()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("本学期")
+            .to_owned();
+
+        let range = self
+            .post_json("/sports/ranking/getUserInfo", "学期日期")
+            .ok()
+            .and_then(|value| {
+                let item = &value["data"]["semesterDateList"][0];
+                let start = server_date(item["startDate"].as_str())?;
+                let end = server_date(item["endDate"].as_str())?;
+                crate::stats::SemesterRange::new(start, end)
+            });
+
+        let records = self.get_json(
+            "/sports/running/result/list",
+            &[("selectId", semester_id), ("type", "1")],
+            "跑步记录",
+        )?;
+        let mut run_days = HashMap::new();
+        for week in records["data"].as_array().into_iter().flatten() {
+            for record in week["details"].as_array().into_iter().flatten() {
+                let Some(date) = server_date(record["timeFrom"].as_str()) else {
+                    continue;
+                };
+                let state = if counts_toward_score(record.get("state")) {
+                    crate::stats::DayState::Valid
+                } else {
+                    crate::stats::DayState::Invalid
+                };
+                crate::stats::record_day(&mut run_days, date, state);
+            }
+        }
+
+        Ok(crate::stats::SemesterStats {
+            result_km,
+            total_km,
+            percent,
+            target_km,
+            semester_name,
+            range,
+            run_days,
+        })
+    }
+
+    fn get_json(&self, path: &str, query: &[(&str, &str)], what: &str) -> Result<Value, String> {
+        let mut request = self
+            .client
+            .get(format!("{}{}", self.base, path))
+            .header("Referer", format!("{}/phone/", self.base));
+        if !query.is_empty() {
+            request = request.query(query);
+        }
+        decode(checked(request.send())?, what)
+    }
+
+    fn post_json(&self, path: &str, what: &str) -> Result<Value, String> {
+        let request = self
+            .client
+            .post(format!("{}{}", self.base, path))
+            .header("Referer", format!("{}/phone/", self.base))
+            .json(&serde_json::json!({}));
+        decode(checked(request.send())?, what)
+    }
+
     pub fn upload(&self, token: &str, payload: &Value) -> Result<(), String> {
         let result: Value = checked(
             self.client
@@ -359,6 +452,61 @@ impl Session {
                     .unwrap_or_else(|| "未知".into())
             ))
         }
+    }
+}
+
+/// 未登录时这些接口会 302 到登录页，跟随跳转后拿到的是 HTML；
+/// 统一识别成「登录状态已过期」，并且绝不把响应正文带进错误信息。
+const LOGIN_EXPIRED: &str = "登录状态已过期，请重新登录后重试";
+
+fn decode(response: Response, what: &str) -> Result<Value, String> {
+    let url = response.url().to_string();
+    if url.contains("/login") || url.contains("jaccount") {
+        return Err(format!("{what}：{LOGIN_EXPIRED}"));
+    }
+    let value: Value = response
+        .json()
+        .map_err(|_| format!("{what}：{LOGIN_EXPIRED}"))?;
+    match value.get("code") {
+        None | Some(Value::Null) => {}
+        Some(code)
+            if code.as_i64() == Some(0)
+                || code.as_str() == Some("0")
+                || code.as_f64() == Some(0.0) => {}
+        _ => return Err(format!("{what}：{LOGIN_EXPIRED}")),
+    }
+    Ok(value)
+}
+
+/// 服务器的数值都是字符串（"80.00"、"100.00"、"80"），偶尔带百分号或千分位。
+fn json_number(value: Option<&Value>) -> Option<f64> {
+    let raw = match value? {
+        Value::Number(number) => number.to_string(),
+        Value::String(text) => text.trim().to_owned(),
+        _ => return None,
+    };
+    raw.trim_end_matches('%')
+        .replace(',', "")
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+}
+
+/// 服务器日期形如 `2026-09-19 07:52:19`，只取前 10 个字符；解析不出的记录直接跳过。
+fn server_date(text: Option<&str>) -> Option<NaiveDate> {
+    let head = text?.get(..10)?;
+    NaiveDate::parse_from_str(head, "%Y-%m-%d").ok()
+}
+
+/// `state == "0"` 计入成绩，12/13 等是无效记录。
+fn counts_toward_score(value: Option<&Value>) -> bool {
+    let Some(value) = value else {
+        return false;
+    };
+    match value {
+        Value::String(text) => text.trim() == "0",
+        Value::Number(number) => number.as_i64() == Some(0),
+        _ => false,
     }
 }
 
@@ -759,6 +907,194 @@ mod tests {
         assert!(requests[3]
             .to_ascii_lowercase()
             .contains("content-type: application/json"));
+    }
+
+    fn offline_date(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
+
+    fn offline_stats_fixture() -> Vec<(u16, &'static str)> {
+        vec![
+            (
+                200,
+                r#"{"code":0,"data":[{"totalKm":"91.22","percent":"100.00","resultKm":"80.00"}]}"#,
+            ),
+            (200, r#"{"code":0,"data":{"target":"80"}}"#),
+            (
+                200,
+                r#"{"code":0,"data":[{"semesterId":"offline-test-only","semesterName":"本学期"}]}"#,
+            ),
+            (
+                200,
+                r#"{"code":0,"data":{"semesterDateList":[{"name":"本学期","startDate":"2026-09-14 00:00:00","endDate":"2027-01-03 23:59:59"}]}}"#,
+            ),
+            (
+                200,
+                r#"{"code":0,"data":[{"allName":"第一周","details":[{"timeFrom":"2026-09-19 07:52:19","duration":"1200","state":"0"},{"timeFrom":"2026-09-20 08:01:02","duration":"900","state":"12"}]}]}"#,
+            ),
+        ]
+    }
+
+    #[test]
+    fn semester_stats_uses_fixed_endpoint_order_and_marks_record_states() {
+        let (session, server) = mock(offline_stats_fixture());
+        let stats = session.semester_stats().unwrap();
+        assert_eq!(stats.result_km, Some(80.0));
+        assert_eq!(stats.total_km, Some(91.22));
+        assert_eq!(stats.percent, Some(100.0));
+        assert_eq!(stats.target_km, Some(80.0));
+        assert_eq!(stats.semester_name, "本学期");
+        let range = stats.range.expect("夹具里有学期起止日期");
+        assert_eq!(range.start, offline_date(2026, 9, 14));
+        assert_eq!(range.end, offline_date(2027, 1, 3));
+        assert_eq!(stats.run_days.len(), 2);
+        assert_eq!(
+            stats.run_days[&offline_date(2026, 9, 19)],
+            crate::stats::DayState::Valid
+        );
+        assert_eq!(
+            stats.run_days[&offline_date(2026, 9, 20)],
+            crate::stats::DayState::Invalid
+        );
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 5);
+        assert!(requests[0].starts_with("GET /sports/my/data "));
+        assert!(requests[1].starts_with("GET /sports/my/semesterTarget "));
+        assert!(requests[2].starts_with("GET /sports/running/semester/list?type=1 "));
+        assert!(requests[3].starts_with("POST /sports/ranking/getUserInfo "));
+        assert!(requests[3]
+            .to_ascii_lowercase()
+            .contains("content-type: application/json"));
+        assert!(requests[4]
+            .starts_with("GET /sports/running/result/list?selectId=offline-test-only&type=1 "));
+    }
+
+    #[test]
+    fn semester_stats_keeps_valid_record_when_a_day_also_has_an_invalid_one() {
+        let mut fixture = offline_stats_fixture();
+        fixture[4] = (
+            200,
+            r#"{"code":0,"data":[{"details":[{"timeFrom":"2026-09-19 07:00:00","state":"13"},{"timeFrom":"2026-09-19 21:00:00","state":"0"},{"timeFrom":"坏日期","state":"0"}]}]}"#,
+        );
+        let (session, server) = mock(fixture);
+        let stats = session.semester_stats().unwrap();
+        assert_eq!(stats.run_days.len(), 1);
+        assert_eq!(
+            stats.run_days[&offline_date(2026, 9, 19)],
+            crate::stats::DayState::Valid
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn semester_stats_derives_percent_when_the_server_omits_it() {
+        let mut fixture = offline_stats_fixture();
+        fixture[0] = (
+            200,
+            r#"{"code":0,"data":[{"totalKm":"50.00","resultKm":"40.00"}]}"#,
+        );
+        let (session, server) = mock(fixture);
+        let stats = session.semester_stats().unwrap();
+        assert_eq!(stats.percent, Some(80.0));
+        assert_eq!(crate::stats::format_percent(stats.percent), "80.0%");
+        server.join().unwrap();
+
+        let mut fixture = offline_stats_fixture();
+        fixture[0] = (200, r#"{"code":0,"data":[{"totalKm":"0","resultKm":"0"}]}"#);
+        let (session, server) = mock(fixture);
+        let stats = session.semester_stats().unwrap();
+        assert_eq!(stats.percent, None);
+        assert_eq!(crate::stats::format_percent(stats.percent), "--");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn semester_stats_treats_non_json_or_error_code_as_expired_session() {
+        let (session, server) = mock(vec![(200, "<html>private-response-body</html>")]);
+        let error = session.semester_stats().unwrap_err();
+        assert!(error.contains("过期"));
+        assert!(!error.contains("private-response-body"));
+        server.join().unwrap();
+
+        let (session, server) = mock(vec![(
+            200,
+            r#"{"code":1,"message":"private-response-body"}"#,
+        )]);
+        let error = session.semester_stats().unwrap_err();
+        assert!(error.contains("过期"));
+        assert!(!error.contains("private-response-body"));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn semester_stats_requires_semester_id_before_fetching_records() {
+        let mut fixture = offline_stats_fixture();
+        fixture[2] = (200, r#"{"code":0,"data":[]}"#);
+        fixture.truncate(3);
+        let (session, server) = mock(fixture);
+        let error = session.semester_stats().unwrap_err();
+        assert!(error.contains("semesterId"));
+        let requests = server.join().unwrap();
+        assert_eq!(requests.len(), 3);
+    }
+
+    #[test]
+    fn semester_stats_reports_expired_session_after_login_redirect() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut session = Session::new().unwrap();
+        session.base = format!("http://{}", listener.local_addr().unwrap());
+        session.client = Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .unwrap();
+        let handle = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for index in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut raw = Vec::new();
+                let mut buf = [0u8; 4096];
+                loop {
+                    let count = stream.read(&mut buf).unwrap();
+                    if count == 0 {
+                        break;
+                    }
+                    raw.extend_from_slice(&buf[..count]);
+                    if raw.windows(4).any(|slice| slice == b"\r\n\r\n") {
+                        break;
+                    }
+                }
+                requests.push(String::from_utf8_lossy(&raw).into_owned());
+                let body: &[u8] = if index == 0 {
+                    b"redirecting"
+                } else {
+                    b"<html>private-login-page</html>"
+                };
+                let head = if index == 0 {
+                    "HTTP/1.1 302 Found\r\nLocation: /login\r\n"
+                } else {
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
+                };
+                write!(
+                    stream,
+                    "{head}Content-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .unwrap();
+                stream.write_all(body).unwrap();
+            }
+            requests
+        });
+        let error = session.semester_stats().unwrap_err();
+        assert!(error.contains("过期"));
+        assert!(!error.contains("private-login-page"));
+        let requests = handle.join().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert!(requests[1].starts_with("GET /login "));
     }
 
     #[test]
