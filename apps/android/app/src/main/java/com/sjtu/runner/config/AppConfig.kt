@@ -13,6 +13,10 @@ object AppConfig {
     const val MY_DATA_URL = "https://pe.sjtu.edu.cn/sports/my/data"
     const val POINT_RULE_URL = "https://pe.sjtu.edu.cn/api/running/point-rule"
     const val UPLOAD_URL = "https://pe.sjtu.edu.cn/api/running/result/upload"
+    const val SEMESTER_TARGET_URL = "https://pe.sjtu.edu.cn/sports/my/semesterTarget"
+    const val SEMESTER_LIST_URL = "https://pe.sjtu.edu.cn/sports/running/semester/list"
+    const val USER_INFO_URL = "https://pe.sjtu.edu.cn/sports/ranking/getUserInfo"
+    const val RESULT_LIST_URL = "https://pe.sjtu.edu.cn/sports/running/result/list"
 
     const val MAX_RUN_TIMES = 30
     const val MAX_DISTANCE_KM = 5.0
