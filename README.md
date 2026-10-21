@@ -1,3 +1,5 @@
+> **归档分支** — 本分支只保留最后一版 Python + Qt 桌面客户端（`qtui.py` 与 `src/`），只读、不再维护、不再发布。当前版本在 `master`，电脑版已改用 Rust + Slint。详见 [ARCHIVE.md](ARCHIVE.md)。
+
 <h1 align="center">SJTU 一键校园跑工具</h1>
 
 <div align="center">
