@@ -1,6 +1,6 @@
 name: Python 检查
 
-# 只在旧版 Qt（Python）客户端相关文件变动时运行。
+# 只在旧版 Python 模块（src/ 与 utils/）相关文件变动时运行。
 # 文档、安卓、iOS、鸿蒙的改动不会触发这个工作流 —— 见同目录 ci-android.yml。
 # `build_windows.ps1` 已经是 Rust 构建脚本，由 desktop-check.yml 覆盖，不再算在这里。
 #
@@ -9,23 +9,19 @@ name: Python 检查
 on:
   pull_request:
     paths:
-      - 'qtui.py'
       - 'src/**'
       - 'utils/**'
       - 'assets/**'
       - 'requirements.txt'
-      - 'main.spec'
       - 'route_planner.html'
       - '.github/workflows/ci-python.yml'
   push:
     branches: [master]
     paths:
-      - 'qtui.py'
       - 'src/**'
       - 'utils/**'
       - 'assets/**'
       - 'requirements.txt'
-      - 'main.spec'
       - 'route_planner.html'
       - '.github/workflows/ci-python.yml'
 
@@ -57,7 +53,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: 语法检查
-        run: python -m compileall -q qtui.py src utils
+        run: python -m compileall -q src utils
 
       - name: 导入冒烟（不依赖图形界面）
         run: |
@@ -87,6 +83,6 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          # qtui 有 __main__ 守卫，导入不会真正开窗；
+          # info_dialog 只导入、不建窗口；
           # 这一步能抓到 PySide6 API 变动与 assets/resources_rc 缺失
-          python -c "import qtui; print('qtui import OK')"
+          python -c "import src.info_dialog; print('src.info_dialog import OK')"

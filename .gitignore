@@ -26,7 +26,6 @@ htmlcov/
 
 # PyInstaller
 *.spec
-!main.spec
 
 # =========================
 # IDE / Editor

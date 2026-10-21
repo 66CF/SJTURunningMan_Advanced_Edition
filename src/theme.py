@@ -1,6 +1,6 @@
 """电脑版亮暗主题：跟随系统 + 手动切换 + 亮色背景由原背景照片换算得到。
 
-主题令牌集中在这里，qtui.py 与 src/info_dialog.py 共用：
+主题令牌集中在这里，src/info_dialog.py 与其它旧 Python 模块共用：
 - `build_theme(mode)` 返回一份颜色令牌字典（CSS 字符串，可直接进 QSS）
 - `main_stylesheet(theme)` 生成主窗口样式表
 - `draw_dark_background()` / `draw_light_background()` 生成窗口背景
