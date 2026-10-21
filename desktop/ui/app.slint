@@ -12,6 +12,10 @@ export global Theme {
     out property <color> control: dark ? #203129 : #f7f9f8;
     out property <color> disabled-ink: dark ? #81978a : #839087;
     out property <color> progress-track: dark ? #233329 : #e6ece8;
+    out property <color> run-valid: dark ? #4f9c68 : #a9dcb5;
+    out property <color> run-invalid: dark ? #2f5c43 : #dcecd9;
+    out property <color> calendar-empty: dark ? #26362e : #eef2ef;
+    out property <color> calendar-ink: dark ? #dcebe0 : #1c3327;
 }
 
 component Label inherits Text {
@@ -157,8 +161,8 @@ component Select inherits Rectangle {
                 }
                 items := ScrollView {
                     x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
-                    viewport-width: self.visible-width;
-                    viewport-y <=> root.popup-scroll-y;
+                    content-width: self.visible-width;
+                    content-y <=> root.popup-scroll-y;
                     VerticalLayout {
                         alignment: start; spacing: 0px;
                         for value[index] in root.model: Rectangle {
@@ -180,6 +184,34 @@ component Card inherits Rectangle {
     border-radius: 12px;
     border-width: 1px;
     border-color: Theme.line;
+}
+
+// 日历按「扁平行」传给 UI：一行 7 个格子，d* 为几号（0 是空白格），s* 为状态
+// （0 未跑、1 计入成绩、2 无效记录）。用扁平结构是为了避开重复行里再嵌 if/for。
+export struct CalendarRow {
+    title: string,
+    d0: int, d1: int, d2: int, d3: int, d4: int, d5: int, d6: int,
+    s0: int, s1: int, s2: int, s3: int, s4: int, s5: int, s6: int,
+}
+
+component DayCell inherits Rectangle {
+    in property <int> day;
+    in property <int> state;
+    height: 26px;
+    horizontal-stretch: 1;
+    background: transparent;
+    if root.day > 0: Rectangle {
+        width: 24px; height: 24px; border-radius: 12px;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        background: root.state == 1 ? Theme.run-valid : root.state == 2 ? Theme.run-invalid : Theme.calendar-empty;
+        border-width: root.state == 2 ? 1px : 0px;
+        border-color: Theme.accent;
+    }
+    if root.day > 0: Text {
+        width: parent.width; height: parent.height;
+        text: root.day + ""; color: Theme.calendar-ink; font-size: 11px;
+        horizontal-alignment: center; vertical-alignment: center;
+    }
 }
 
 component NavItem inherits Rectangle {
@@ -245,6 +277,9 @@ export component AppWindow inherits Window {
     in property <string> notice;
     in property <string> version;
     in property <string> update-status: "按需检查更新，启动时不请求网络。";
+    in property <[CalendarRow]> calendar-rows;
+    in property <string> semester-km: "--";
+    in property <string> semester-percent: "--";
     // 0：关闭；1：账号登录（图形验证码自动识别）；2：二次验证。
     in-out property <int> login-stage: 0;
     in-out property <bool> consent-open: true;
@@ -318,51 +353,80 @@ export component AppWindow inherits Window {
             }
 
             if root.page == 0 || root.page == 1: ScrollView {
-                viewport-width: self.visible-width;
+                content-width: self.visible-width;
                 HorizontalLayout {
                     spacing: 16px;
-                    if root.page == 0: Card {
-                        width: 300px; height: plan-layout.min-height;
-                        plan-layout := VerticalLayout {
-                            padding: 18px; spacing: 10px; alignment: start;
-                            Label { text: "跑步计划"; font-size: 15px; font-weight: 600; }
-                            Muted { text: "按日期向前生成，每天一条记录。"; }
-                            Rectangle { height: 1px; background: Theme.line; }
-                            HorizontalLayout {
-                                spacing: 14px;
-                                Field { label: "跑步次数 / 次"; text <=> root.runs; enabled: !root.busy; }
-                                Field { label: "单次距离 / km"; text <=> root.distance; enabled: !root.busy; }
+                    if root.page == 0: Rectangle {
+                        width: 300px; background: transparent;
+                        home-column := VerticalLayout {
+                            spacing: 16px; alignment: start;
+                            Card {
+                                vertical-stretch: 0; height: plan-layout.min-height;
+                                plan-layout := VerticalLayout {
+                                    padding: 18px; spacing: 10px; alignment: start;
+                                    Label { text: "跑步计划"; font-size: 15px; font-weight: 600; }
+                                    Muted { text: "按日期向前生成，每天一条记录。"; }
+                                    Rectangle { height: 1px; background: Theme.line; }
+                                    HorizontalLayout {
+                                        spacing: 14px;
+                                        Field { label: "跑步次数 / 次"; text <=> root.runs; enabled: !root.busy; }
+                                        Field { label: "单次距离 / km"; text <=> root.distance; enabled: !root.busy; }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 12px;
+                                        Field { label: "结束日期"; placeholder: "YYYY-MM-DD"; text <=> root.run-date; enabled: !root.busy; }
+                                        Field { label: "开始时间"; placeholder: "HH:MM:SS"; text <=> root.run-time; enabled: !root.busy; }
+                                    }
+                                    Muted { text: "开始时间会在设定值附近随机浮动。"; font-size: 11px; wrap: word-wrap; }
+                                    Rectangle { height: 1px; background: Theme.line; }
+                                    Label { text: "选择路线"; font-size: 12px; font-weight: 600; }
+                                    Select {
+                                        model: root.route-names;
+                                        current-index <=> root.route-index;
+                                        enabled: !root.busy;
+                                        selected(value) => { root.select-route(root.route-index); }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        Action { text: "导入 TXT"; enabled: !root.busy; clicked => { root.import-route(); } }
+                                        Action { text: "设计路线 ↗"; clicked => { root.planner(); } }
+                                    }
+                                    VerticalLayout {
+                                        padding-top: 6px;
+                                        Rectangle {
+                                        height: 58px; border-radius: 8px; background: Theme.soft;
+                                        VerticalLayout {
+                                            padding: 12px; spacing: 5px; alignment: start;
+                                            Label { text: "开始前请检查预览"; color: Theme.accent; font-size: 12px; font-weight: 600; }
+                                            Muted { text: "确认距离、起终点和路线连续性。"; font-size: 11px; }
+                                        }
+                                        }
+                                    }
+                                }
                             }
-                            HorizontalLayout {
-                                spacing: 12px;
-                                Field { label: "结束日期"; placeholder: "YYYY-MM-DD"; text <=> root.run-date; enabled: !root.busy; }
-                                Field { label: "开始时间"; placeholder: "HH:MM:SS"; text <=> root.run-time; enabled: !root.busy; }
-                            }
-                            Muted { text: "开始时间会在设定值附近随机浮动。"; font-size: 11px; wrap: word-wrap; }
-                            Rectangle { height: 1px; background: Theme.line; }
-                            Label { text: "选择路线"; font-size: 12px; font-weight: 600; }
-                            Select {
-                                model: root.route-names;
-                                current-index <=> root.route-index;
-                                enabled: !root.busy;
-                                selected(value) => { root.select-route(root.route-index); }
-                            }
-                            HorizontalLayout {
-                                spacing: 10px;
-                                Action { text: "导入 TXT"; enabled: !root.busy; clicked => { root.import-route(); } }
-                                Action { text: "设计路线 ↗"; clicked => { root.planner(); } }
-                            }
-                            VerticalLayout {
-                                padding-top: 6px;
-                                Rectangle {
-                                height: 58px; border-radius: 8px; background: Theme.soft;
+                            Card {
+                                vertical-stretch: 0;
                                 VerticalLayout {
-                                    padding: 12px; spacing: 5px; alignment: start;
-                                    Label { text: "开始前请检查预览"; color: Theme.accent; font-size: 12px; font-weight: 600; }
-                                    Muted { text: "确认距离、起终点和路线连续性。"; font-size: 11px; }
-                                }
+                                    padding: 18px; spacing: 10px; alignment: start;
+                                    Label { text: "本学期进度"; font-size: 15px; font-weight: 600; }
+                                    Muted { text: root.logged-in ? "登录状态下自动同步，只读展示当前学期。" : "登录账号后自动同步本学期数据。"; wrap: word-wrap; }
+                                    Rectangle { height: 1px; background: Theme.line; }
+                                    HorizontalLayout {
+                                        spacing: 14px;
+                                        VerticalLayout {
+                                            spacing: 4px;
+                                            Muted { text: "达标公里"; font-size: 11px; }
+                                            Label { text: root.semester-km; font-size: 22px; font-weight: 700; color: Theme.accent; }
+                                        }
+                                        VerticalLayout {
+                                            spacing: 4px;
+                                            Muted { text: "完成率"; font-size: 11px; }
+                                            Label { text: root.semester-percent; font-size: 22px; font-weight: 700; color: Theme.accent; }
+                                        }
+                                    }
                                 }
                             }
+                            Rectangle { vertical-stretch: 1; background: transparent; }
                         }
                     }
                     Card {
@@ -405,30 +469,73 @@ export component AppWindow inherits Window {
                 }
             }
 
-            if root.page == 2: Card {
-                VerticalLayout {
-                    padding: 20px; spacing: 18px;
-                    HorizontalLayout {
-                        spacing: 16px;
-                        VerticalLayout {
-                            horizontal-stretch: 1; spacing: 6px;
-                            Label { text: "运行记录"; font-size: 15px; font-weight: 600; }
-                            Muted { text: "仅保留本次会话，不写入磁盘。"; wrap: word-wrap; }
+            if root.page == 2: HorizontalLayout {
+                spacing: 16px;
+                Card {
+                    horizontal-stretch: 1; preferred-width: 0px; min-width: 0px;
+                    VerticalLayout {
+                        padding: 20px; spacing: 14px;
+                        Label { text: "学期日历"; font-size: 15px; font-weight: 600; }
+                        Muted { text: root.logged-in ? "实心绿=计入成绩，描边=无效记录，灰=未跑。" : "登录后显示本学期打卡记录。"; wrap: word-wrap; }
+                        Rectangle { height: 1px; background: Theme.line; }
+                        HorizontalLayout {
+                            spacing: 0px; vertical-stretch: 0;
+                            Muted { text: "周一"; font-size: 11px; horizontal-alignment: center; }
+                            Muted { text: "周二"; font-size: 11px; horizontal-alignment: center; }
+                            Muted { text: "周三"; font-size: 11px; horizontal-alignment: center; }
+                            Muted { text: "周四"; font-size: 11px; horizontal-alignment: center; }
+                            Muted { text: "周五"; font-size: 11px; horizontal-alignment: center; }
+                            Muted { text: "周六"; font-size: 11px; horizontal-alignment: center; }
+                            Muted { text: "周日"; font-size: 11px; horizontal-alignment: center; }
                         }
-                        Action { text: "清空日志"; height: 32px; clicked => { root.clear-log(); } }
+                        ScrollView {
+                            content-width: self.visible-width;
+                            VerticalLayout {
+                                alignment: start; spacing: 2px;
+                                for row in root.calendar-rows: VerticalLayout {
+                                    spacing: 2px; vertical-stretch: 0;
+                                    Text { text: row.title; color: Theme.muted; font-size: 11px; height: row.title == "" ? 0px : 18px; vertical-alignment: center; }
+                                    HorizontalLayout {
+                                        spacing: 0px; vertical-stretch: 0;
+                                        DayCell { day: row.d0; state: row.s0; }
+                                        DayCell { day: row.d1; state: row.s1; }
+                                        DayCell { day: row.d2; state: row.s2; }
+                                        DayCell { day: row.d3; state: row.s3; }
+                                        DayCell { day: row.d4; state: row.s4; }
+                                        DayCell { day: row.d5; state: row.s5; }
+                                        DayCell { day: row.d6; state: row.s6; }
+                                    }
+                                }
+                            }
+                        }
                     }
-                    ScrollView {
-                        viewport-width: self.visible-width;
-                        VerticalLayout {
-                            alignment: start;
-                            Text { text: root.log-text == "" ? "暂无任务日志" : root.log-text; color: root.log-text == "" ? Theme.muted : Theme.ink; font-family: "Consolas"; font-size: 13px; wrap: word-wrap; vertical-stretch: 0; horizontal-alignment: left; vertical-alignment: top; }
+                }
+                Card {
+                    horizontal-stretch: 1; preferred-width: 0px; min-width: 0px;
+                    VerticalLayout {
+                        padding: 20px; spacing: 18px;
+                        HorizontalLayout {
+                            spacing: 16px;
+                            VerticalLayout {
+                                horizontal-stretch: 1; spacing: 6px;
+                                Label { text: "运行记录"; font-size: 15px; font-weight: 600; }
+                                Muted { text: "仅保留本次会话，不写入磁盘。"; wrap: word-wrap; }
+                            }
+                            Action { text: "清空日志"; height: 32px; clicked => { root.clear-log(); } }
+                        }
+                        ScrollView {
+                            content-width: self.visible-width;
+                            VerticalLayout {
+                                alignment: start;
+                                Text { text: root.log-text == "" ? "暂无任务日志" : root.log-text; color: root.log-text == "" ? Theme.muted : Theme.ink; font-family: "Consolas"; font-size: 13px; wrap: word-wrap; vertical-stretch: 0; horizontal-alignment: left; vertical-alignment: top; }
+                            }
                         }
                     }
                 }
             }
 
             if root.page == 3: ScrollView {
-                viewport-width: self.visible-width;
+                content-width: self.visible-width;
                 VerticalLayout {
                     spacing: 16px; alignment: start;
                     Card {
