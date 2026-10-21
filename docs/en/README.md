@@ -32,6 +32,7 @@ This directory is the English mirror of the project documentation. The root [REA
 | [SECURITY.md](../../SECURITY.md) | Vulnerability reporting and credential safety |
 | [AGENTS.md](../../AGENTS.md) | Repository map for AI coding assistants |
 | [CHANGELOG.md](../../CHANGELOG.md) | Release history |
+| Branch `archive/python-qtui-legacy` | Read-only snapshot of the last Python + Qt client (tag `python-qtui-final`); unmaintained, kept only to compare against legacy behaviour |
 
 ## Repository layout
 

@@ -2,6 +2,9 @@ name: Native desktop checks
 on:
   workflow_dispatch:
   push:
+    # tag push 会把整棵树算作变更，paths 过滤拦不住它；发版 tag 与归档 tag
+    # 都由 release.yml 负责，这里不重复跑一遍桌面检查。
+    tags-ignore: '*'
     paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/**', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml']
   pull_request:
     paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/**', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml']

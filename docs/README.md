@@ -32,6 +32,7 @@
 | [SECURITY.md](../SECURITY.md) | 漏洞报告通道与凭据安全须知 |
 | [AGENTS.md](../AGENTS.md) | 给 AI 编码助手（Claude Code / Cursor 等）的仓库地图 |
 | [CHANGELOG.md](../CHANGELOG.md) | 版本更新日志 |
+| 归档分支 `archive/python-qtui-legacy` | 最后一版 Python + Qt 客户端的只读快照（tag `python-qtui-final`），不再维护，仅用于比对旧版行为 |
 
 ## 仓库结构
 

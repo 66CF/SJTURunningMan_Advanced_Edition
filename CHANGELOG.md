@@ -15,7 +15,7 @@
 - **电脑版** — **登录后按学期缺口自动设定跑步计划**：登录或二次验证成功后的第一次学期数据同步会按本学期未完成公里数反推「跑步次数 × 单次距离」（单次 1–5 km、次数不超过 30 次，向上取整保证补上缺口）并填入输入框；若这两个值已被你手动修改过则保持不变，只在日志说明原因。上传后的刷新不再重排计划，自动填入的值跨启动保留。
 - **电脑版 / iOS** — **版本号对齐**：电脑版 `v4.4.0` → `v4.5.0`，iOS `MARKETING_VERSION` `1.0` → `4.5.0`，与安卓一致。
 - **仓库** — **移除旧 Qt 入口 `qtui.py` 与 `main.spec`**：默认构建与发布早已切换到 Rust，旧入口和它的 PyInstaller 配置不再被使用，`main.spec` 的入口也正是 `qtui.py`。`src/` 与 `utils/` 保留作迁移对照，`ci-python.yml` 改为只检查这些模块（界面导入冒烟改跑 `src.info_dialog`）。文档新增「从源码运行 / Run from source」说明：克隆仓库后 `cargo run --locked -p sjturunningman` 即可，无需安装包、Python 或 Qt。
-- **仓库** — **退役旧 Python 模块**：删除 `src/`、`utils/`、`requirements.txt` 与 `ci-python.yml`。`assets/resources_rc.py` 一并移除 —— 它只被 `src/info_dialog.py` 副作用导入，内嵌的 `:/resources/` 资源没有任何代码引用、也没有对应松散文件，因此无需迁移。同时删除无引用的旧素材 `assets/background.jpg`、`assets/mainBackground.jpeg`、`assets/SJTURM_rounded.png`、`assets/Sample_Bright.webp`、`assets/Sample_Dark.webp`，以及与 `assets/Routes/default.txt` 逐字节重复的根目录 `default.txt`；`.gitignore` 去掉 PyInstaller 与 `ui_settings.json` 规则。仓库里只剩 `scripts/` 下的打包脚本用到 Python。
+- **仓库** — **退役旧 Python 模块**：删除 `src/`、`utils/`、`requirements.txt` 与 `ci-python.yml`。`assets/resources_rc.py` 一并移除 —— 它只被 `src/info_dialog.py` 副作用导入，内嵌的 `:/resources/` 资源没有任何代码引用、也没有对应松散文件，因此无需迁移。同时删除无引用的旧素材 `assets/background.jpg`、`assets/mainBackground.jpeg`、`assets/SJTURM_rounded.png`、`assets/Sample_Bright.webp`、`assets/Sample_Dark.webp`，以及与 `assets/Routes/default.txt` 逐字节重复的根目录 `default.txt`；`.gitignore` 去掉 PyInstaller 与 `ui_settings.json` 规则。仓库里只剩 `scripts/` 下的打包脚本用到 Python。最后一版 Python + Qt 客户端（`qtui.py`、`main.spec` 与整套 `src/`）没有消失，而是完整留存在只读归档分支 `archive/python-qtui-legacy`，同一快照打了 tag `python-qtui-final`；归档说明见该分支的 `ARCHIVE.md`。
 
 ### v4.4.3 — 2026-10-13
 

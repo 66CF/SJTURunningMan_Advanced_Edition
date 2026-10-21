@@ -29,6 +29,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 3. **`assets/Routes/NeedsReview/` 是隔离区。** 里面的路线有跳段 / 长度 / 起终点问题，不要直接把它们加回内置列表。
 4. **路线坐标系**：路线文件存 BD09；桌面地图页默认百度、可切 OSM，百度点击直接是 BD09，OSM 瓦片是 WGS84、点击后转 BD09 保存，上传前由客户端转 GCJ02。见 [docs/routes.md](docs/routes.md)。
 5. **内层路径随目录整体搬迁后仍成立**（Gradle、Xcode pbxproj、hvigor 都是相对引用）。移动 `apps/<平台>/` 只需同步 `.gitignore` 里的前缀规则。
+6. **旧 Python / Qt 版只读归档在 `archive/python-qtui-legacy`。** 最后一版 `qtui.py`、`main.spec` 与整套 `src/` 模块永久留在那条分支上（同一快照另有 tag `python-qtui-final`），只用于比对旧版行为：不要合并回 `master`、不要 cherry-pick、也不要在那条分支上继续开发。归档说明见该分支的 `ARCHIVE.md`。
 
 ## 四套实现的对应关系
 

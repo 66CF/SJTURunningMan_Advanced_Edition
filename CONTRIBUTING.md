@@ -49,6 +49,7 @@ DevEco Studio，签名与 HAP 构建见 [docs/build.md](docs/build.md#鸿蒙)。
   ```
 
 - 提交信息说清**做了什么**；**为什么**不显然时补一段正文。
+- **归档分支 `archive/python-qtui-legacy` 只读**：最后一版 Python + Qt 客户端的快照（tag `python-qtui-final`），只用来比对旧版行为。不要从它往 `master` 恢复代码，也不要在那条分支上提改动。
 
 ## 提交前自检
 
