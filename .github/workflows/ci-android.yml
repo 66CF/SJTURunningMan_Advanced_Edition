@@ -1,7 +1,7 @@
 name: 安卓构建与测试
 
 # 只在 apps/android/ 下的文件变动时运行。
-# 电脑版（Python）、文档、iOS、鸿蒙的改动不会触发这个工作流 —— 见同目录 ci-python.yml。
+# 电脑版、文档、iOS、鸿蒙的改动不会触发这个工作流 —— 见同目录 desktop-check.yml。
 
 on:
   pull_request:

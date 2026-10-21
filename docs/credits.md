@@ -19,7 +19,7 @@
 ## 依赖与资源
 
 - [Rust](https://www.rust-lang.org/) + [Slint](https://slint.dev/) — 电脑版界面与运行时
-- [PySide6 / Qt](https://www.qt.io/) — 旧版电脑版界面（保留作迁移对照）
+- [PySide6 / Qt](https://www.qt.io/) — 旧版电脑版界面（v4.4.x 及更早，已退役）
 - [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) — 电脑版路线规划器底图
 - [百度地图](https://lbsyun.baidu.com/) — 移动端路线设计页底图
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) — 安卓界面

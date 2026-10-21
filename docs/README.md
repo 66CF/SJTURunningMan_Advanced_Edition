@@ -32,6 +32,7 @@
 | [SECURITY.md](../SECURITY.md) | 漏洞报告通道与凭据安全须知 |
 | [AGENTS.md](../AGENTS.md) | 给 AI 编码助手（Claude Code / Cursor 等）的仓库地图 |
 | [CHANGELOG.md](../CHANGELOG.md) | 版本更新日志 |
+| 归档分支 `archive/python-qtui-legacy` | 最后一版 Python + Qt 客户端的只读快照（tag `python-qtui-final`），不再维护，仅用于比对旧版行为 |
 
 ## 仓库结构
 
@@ -39,9 +40,7 @@
 SJTURunningMan_Advanced_Edition/
 ├── desktop/                Rust + Slint 电脑版（src/ 与 ui/）
 ├── Cargo.toml              桌面 Cargo workspace（版本号在 desktop/Cargo.toml）
-├── src/                    旧 Python 模块；config.py 只对应旧客户端版本号
-├── utils/                  通用工具
-├── assets/                 图标、背景、内置路线（assets/Routes/）
+├── assets/                 图标、内置路线（assets/Routes/）
 ├── build_windows.ps1       Windows 打包脚本
 ├── route_planner.html      电脑版路线规划器（默认百度，可切 OpenStreetMap）
 ├── apps/

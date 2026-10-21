@@ -34,7 +34,7 @@ The new desktop-check.yml configures three-OS build/test/static checks and Windo
 - Automatic CAPTCHA recognition through the legacy service is preserved. Manual entry appears only as a fallback after recognition failure.
 - Coordinate calibration, fixed 200 m distance compensation, start-time variation, and payload fields are preserved. Sampling is reimplemented and retains corners to avoid shortening distances.
 - Long routes are automatically truncated; the old Qt option to keep the complete route is removed. Preview shows actual generated length.
-- Import legacy TXT routes into the new user data directory. The legacy Python modules `src/` and `utils/` and the real `assets/resources_rc.py` dependency remain (the old Qt entry point has been removed).
+- Import legacy TXT routes into the new user data directory. The legacy Python modules `src/` and `utils/` and `assets/resources_rc.py` have been removed together: the latter was only a side-effect import of `src/info_dialog.py`, and none of its embedded `:/resources/` entries were referenced by any code or existed as loose files, so nothing needed migrating.
 
 ## CAPTCHA regression fix
 
@@ -103,7 +103,7 @@ Not yet verified: Baidu/OSM rendering on real Windows/Linux, Baidu AK behaviour 
 
 ## Semester statistics and semester calendar (2026-10-21)
 
-The workspace gains a read-only "本学期进度" (this semester's progress) card showing qualifying distance and completion rate, and the Logs page becomes a semester calendar on the left with the run log on the right. Only `desktop/` changed; the mobile clients and the legacy Python modules are untouched.
+The workspace gains a read-only "本学期进度" (this semester's progress) card showing qualifying distance and completion rate, and the Logs page becomes a semester calendar on the left with the run log on the right. Only `desktop/` changed; the mobile clients are untouched.
 
 - Statistics come from five read-only requests in a fixed order: `GET /sports/my/data` → `GET /sports/my/semesterTarget` → `GET /sports/running/semester/list?type=1` → `POST /sports/ranking/getUserInfo` (empty JSON body) → `GET /sports/running/result/list?selectId=<semesterId>&type=1`. They need only the `pe.sjtu.edu.cn` session cookie, not the token exchanged through `/sports/my/uid`. A redirect to `/login`, a non-JSON body, or `code != 0` is all reported as an expired login, with a controlled message that never carries the response body. A missing `semesterId` fails immediately instead of requesting the record list.
 - Pure logic lives in the new `desktop/src/stats.rs`: semester-range guards (`end < start` or a span over 400 days yields nothing), a Monday-first month-by-month calendar grid, blank cells at month edges, "counts toward score" winning over an invalid record on the same day, and `--` / one-decimal percent formatting. Parsing lives in `Session::semester_stats`. The UI uses a flat row model plus seven explicit `DayCell` elements to avoid Slint's restriction on nesting `if` / `for` inside repeated rows.

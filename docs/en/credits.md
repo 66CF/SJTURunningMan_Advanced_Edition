@@ -19,7 +19,7 @@ This project stands on the work of its predecessors and many helpful contributor
 ## Dependencies and assets
 
 - [Rust](https://www.rust-lang.org/) + [Slint](https://slint.dev/) — desktop UI and runtime
-- [PySide6 / Qt](https://www.qt.io/) — legacy desktop UI (kept as a migration reference)
+- [PySide6 / Qt](https://www.qt.io/) — legacy desktop UI (v4.4.x and earlier, retired)
 - [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) — desktop route planner base map
 - [Baidu Maps](https://lbsyun.baidu.com/) — mobile route design base map
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) — Android UI

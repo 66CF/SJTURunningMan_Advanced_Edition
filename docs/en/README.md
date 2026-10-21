@@ -32,6 +32,7 @@ This directory is the English mirror of the project documentation. The root [REA
 | [SECURITY.md](../../SECURITY.md) | Vulnerability reporting and credential safety |
 | [AGENTS.md](../../AGENTS.md) | Repository map for AI coding assistants |
 | [CHANGELOG.md](../../CHANGELOG.md) | Release history |
+| Branch `archive/python-qtui-legacy` | Read-only snapshot of the last Python + Qt client (tag `python-qtui-final`); unmaintained, kept only to compare against legacy behaviour |
 
 ## Repository layout
 
@@ -39,9 +40,7 @@ This directory is the English mirror of the project documentation. The root [REA
 SJTURunningMan_Advanced_Edition/
 ├── desktop/                Rust + Slint desktop (src/ and ui/)
 ├── Cargo.toml              Desktop Cargo workspace (version lives in desktop/Cargo.toml)
-├── src/                    Legacy Python modules; config.py only versions the legacy client
-├── utils/                  Shared helpers
-├── assets/                 Icons, backgrounds, built-in routes (assets/Routes/)
+├── assets/                 Icons and built-in routes (assets/Routes/)
 ├── build_windows.ps1       Windows packaging script
 ├── route_planner.html      Desktop route planner (Baidu by default, OpenStreetMap optional)
 ├── apps/

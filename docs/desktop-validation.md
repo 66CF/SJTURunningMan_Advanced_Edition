@@ -34,7 +34,7 @@
 - 登录保留旧版自动识别图形验证码；识别服务异常时才显示手动备用输入。
 - 保留旧客户端坐标校准、固定 200 m 距离补偿、开始时间波动及 payload 字段；采样器重新实现，并保留拐点避免距离缩短。
 - 长于目标的路线自动截取；旧 Qt 的「沿完整路线」选择不再出现。实际生成长度会显示在预览中。
-- 旧路线需通过「导入 TXT」迁移到用户数据目录；旧 Python 模块 `src/`、`utils/` 和真实依赖 `assets/resources_rc.py` 仍保留（旧 Qt 入口已移除）。
+- 旧路线需通过「导入 TXT」迁移到用户数据目录。旧 Python 模块 `src/`、`utils/` 与 `assets/resources_rc.py` 已一并移除：后者只被 `src/info_dialog.py` 副作用导入，内嵌的 `:/resources/` 资源没有任何代码引用，也没有对应的松散文件，因此无需迁移。
 
 ## 验证码回归修复
 
@@ -103,7 +103,7 @@
 
 ## 学期统计与学期日历（2026-10-21）
 
-工作台新增只读「本学期进度」卡片（达标公里、完成率），「任务日志」改为左侧学期日历 + 右侧运行日志。改动只在 `desktop/`，移动端与旧 Python 模块未变。
+工作台新增只读「本学期进度」卡片（达标公里、完成率），「任务日志」改为左侧学期日历 + 右侧运行日志。改动只在 `desktop/`，移动端未变。
 
 - 统计由五条固定顺序的只读请求组成：`GET /sports/my/data` → `GET /sports/my/semesterTarget` → `GET /sports/running/semester/list?type=1` → `POST /sports/ranking/getUserInfo`（空 JSON body）→ `GET /sports/running/result/list?selectId=<semesterId>&type=1`。这些接口只需要 `pe.sjtu.edu.cn` 的会话 Cookie，不需要 `/sports/my/uid` 换取的 token。跳转到 `/login`、返回非 JSON、或 `code != 0` 一律识别为「登录状态已过期」，错误信息只带受控分类，不带响应正文。学期列表缺少 `semesterId` 时直接失败，不再请求记录列表。
 - 纯逻辑放在新模块 `desktop/src/stats.rs`：学期区间防御（`end < start` 或跨度超过 400 天返回空）、周一起始的按月日历网格、月首尾空白格、同日多记录时「计入成绩」优先于无效记录、`--` 与一位小数的百分比格式化。网络解析在 `Session::semester_stats`。界面用扁平行模型加 7 个显式 `DayCell`，避开 Slint 在重复行内再嵌 `if` / `for` 的限制。
