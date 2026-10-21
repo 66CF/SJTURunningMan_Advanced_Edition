@@ -55,6 +55,10 @@ Use Import TXT and select UTF-8 text with one BD09 longitude,latitude pair per l
 
 Automatic recognition through the legacy service has been restored. Refresh to retry if recognition fails, or use the manual fallback. Login preserves the legacy delay after recognition and follows the server's returned redirect. Account login and My SJTU app verification have been checked live. When the school requires a six-digit second-factor code, the account holder still needs to receive and enter it.
 
+### Why does every login ask for second-factor verification
+
+Submitting the six-digit code marks this machine as a trusted device, as the legacy client did, so the server remembers it and later logins normally do not ask again. The client keeps the session only while the program runs and never writes cookies to disk, so restarting still requires a new login. If the same machine keeps being asked, that is the school's risk-control decision and the client cannot bypass it.
+
 ---
 
 ## Android / HarmonyOS
