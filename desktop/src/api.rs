@@ -249,12 +249,13 @@ impl Session {
         if code.len() != 6 || !code.bytes().all(|c| c.is_ascii_digit()) {
             return Err("请输入 6 位数字验证码".into());
         }
+        // trust=true 让服务端把本机记为可信设备，与旧版客户端一致；传 false 时每次登录都会重新要求二次验证。
         let value: Value = checked(
             self.client
                 .post(format!("{ACCOUNT}/jaccount/2faVerify"))
                 .header("Referer", ACCOUNT)
                 .header("X-Requested-With", "XMLHttpRequest")
-                .form(&[("account", username), ("captcha", code), ("trust", "false")])
+                .form(&[("account", username), ("captcha", code), ("trust", "true")])
                 .send(),
         )?
         .json()
