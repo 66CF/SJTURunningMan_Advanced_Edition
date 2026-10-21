@@ -13,6 +13,10 @@ pub struct Settings {
     pub distance: String,
     pub time: String,
     pub route: String,
+    /// 上传时跳过学期日历里已有记录的日期。
+    pub skip_existing: bool,
+    /// 记录当前的次数 / 距离是客户端按学期缺口自动填的，不是用户手改的。
+    pub plan_auto: bool,
 }
 
 impl Default for Settings {
@@ -23,6 +27,8 @@ impl Default for Settings {
             distance: "4".into(),
             time: "08:00:00".into(),
             route: "default".into(),
+            skip_existing: true,
+            plan_auto: false,
         }
     }
 }
@@ -141,6 +147,20 @@ mod tests {
         for secret in ["password", "cookie", "username", "token"] {
             assert!(!text.contains(secret));
         }
+    }
+
+    #[test]
+    fn settings_from_older_version_keep_new_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("settings.json"),
+            r#"{"dark":true,"runs":"3","distance":"2.5","time":"07:30:00","route":"old"}"#,
+        )
+        .unwrap();
+        let saved = load(dir.path()).unwrap();
+        assert_eq!(saved.runs, "3");
+        assert!(saved.skip_existing);
+        assert!(!saved.plan_auto);
     }
 
     #[test]

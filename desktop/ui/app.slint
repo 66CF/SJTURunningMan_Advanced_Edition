@@ -1,4 +1,4 @@
-import { ScrollView, CheckBox, Palette } from "std-widgets.slint";
+import { ScrollView, Palette } from "std-widgets.slint";
 
 export global Theme {
     in-out property <bool> dark: false;
@@ -186,6 +186,49 @@ component Card inherits Rectangle {
     border-color: Theme.line;
 }
 
+// 绿色系勾选行：与卡片背景同一套配色，替代 std-widgets 的 CheckBox。
+component Option inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in-out property <bool> checked;
+    height: 34px;
+    vertical-stretch: 0;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: focus.has-focus && root.enabled ? Theme.accent : Theme.line;
+    background: !root.enabled ? Theme.control : touch.has-hover ? (Theme.dark ? #2f4b3c : #e1ece3) : Theme.soft;
+    accessible-role: checkbox;
+    accessible-enabled: root.enabled;
+    accessible-label: root.text;
+    accessible-checked <=> root.checked;
+    accessible-action-default => { if root.enabled { root.checked = !root.checked; } }
+    animate background { duration: 120ms; }
+    forward-focus: focus;
+    option-content := HorizontalLayout {
+        padding-left: 12px; padding-right: 12px; spacing: 9px; alignment: start;
+        Rectangle {
+            width: 18px; height: 18px; border-radius: 5px;
+            background: root.checked ? Theme.accent : Theme.card;
+            border-width: root.checked ? 0px : 1px;
+            border-color: root.checked ? transparent : Theme.line;
+            if root.checked: Text {
+                text: "✓"; color: Theme.dark ? #10241b : #ffffff; font-size: 12px; font-weight: 700;
+                horizontal-alignment: center; vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+        Text { text: root.text; color: !root.enabled ? Theme.disabled-ink : Theme.ink; font-size: 13px; vertical-alignment: center; }
+    }
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if root.enabled && (event.text == " " || event.text == Key.Return) { root.checked = !root.checked; return accept; }
+            return reject;
+        }
+    }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { focus.focus(); root.checked = !root.checked; } }
+}
+
 // 日历按「扁平行」传给 UI：一行 7 个格子，d* 为几号（0 是空白格），s* 为状态
 // （0 未跑、1 计入成绩、2 无效记录）。用扁平结构是为了避开重复行里再嵌 if/for。
 export struct CalendarRow {
@@ -252,6 +295,8 @@ export component AppWindow inherits Window {
     in-out property <int> page: 0;
     in-out property <string> runs: "1";
     in-out property <string> distance: "4";
+    // 上传时自动跳过学期日历里已有记录的日期。
+    in-out property <bool> skip-existing: true;
     in-out property <string> run-date;
     in-out property <string> run-time: "08:00:00";
     in-out property <string> username;
@@ -377,6 +422,8 @@ export component AppWindow inherits Window {
                                         Field { label: "开始时间"; placeholder: "HH:MM:SS"; text <=> root.run-time; enabled: !root.busy; }
                                     }
                                     Muted { text: "开始时间会在设定值附近随机浮动。"; font-size: 11px; wrap: word-wrap; }
+                                    Option { text: "跳过已有记录的日期"; checked <=> root.skip-existing; enabled: !root.busy; }
+                                    Muted { text: "已有记录的那几天挪到更早日期。"; font-size: 11px; }
                                     Rectangle { height: 1px; background: Theme.line; }
                                     Label { text: "选择路线"; font-size: 12px; font-weight: 600; }
                                     Select {
@@ -655,7 +702,7 @@ export component AppWindow inherits Window {
                     text: "在继续使用本软件前，请认真阅读并作出承诺：\n\n1. 我理解本项目仅用于学习、研究和技术测试，主要用于理解运动数据记录与上传相关的技术流程。\n\n2. 我理解项目开发者反对任何违反学校规定的使用方式。\n\n3. 我承诺在使用前确认自己的行为符合上海交通大学校规及相关法律法规的要求。\n\n4. 我承诺不会将本软件用于伪造运动数据、规避体育锻炼要求或其他违规操作。";
                     wrap: word-wrap;
                 }
-                CheckBox { text: "我已阅读以上内容，并承诺不会将本软件用于任何违规操作。"; checked <=> root.consent-checked; }
+                Option { text: "我已阅读以上内容，并承诺不会将本软件用于任何违规操作。"; checked <=> root.consent-checked; }
                 HorizontalLayout {
                     spacing: 12px;
                     Action { text: "退出"; clicked => { root.quit(); } }

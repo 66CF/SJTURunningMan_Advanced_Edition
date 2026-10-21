@@ -187,6 +187,45 @@ pub fn percent_from_ratio(numerator: Option<f64>, denominator: Option<f64>) -> O
     }
 }
 
+/// 自动排计划的边界：单次距离取服务器允许的 1–5 km，次数取客户端上限 30。
+pub const PLAN_MIN_KM: f64 = 1.0;
+pub const PLAN_MAX_KM: f64 = 5.0;
+pub const PLAN_MAX_RUNS: u32 = 30;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AutoPlan {
+    pub runs: u32,
+    pub distance_km: f64,
+}
+
+/// 按本学期未完成公里数反推「次数 × 单次距离」：先用单次上限摊出次数，再把缺口
+/// 平摊到每次并向上取整到 0.01 km，保证这批记录足以补上缺口。
+///
+/// 公里数换算成整百分公里再取整，避免 `21 / 5` 这类浮点误差把 4.2 变成 4.21。
+pub fn auto_plan(remaining_km: f64) -> Option<AutoPlan> {
+    let remaining = finite(Some(remaining_km))?;
+    if remaining <= 0.0 {
+        return None;
+    }
+    let centis = (remaining * 100.0).round();
+    let runs = (centis / (PLAN_MAX_KM * 100.0))
+        .ceil()
+        .clamp(1.0, f64::from(PLAN_MAX_RUNS)) as u32;
+    let distance = (centis / f64::from(runs)).ceil() / 100.0;
+    Some(AutoPlan {
+        runs,
+        distance_km: distance.clamp(PLAN_MIN_KM, PLAN_MAX_KM),
+    })
+}
+
+/// 填进输入框的距离：去掉多余的零，`4.00 → "4"`、`4.50 → "4.5"`、`4.25 → "4.25"`。
+pub fn format_plan_km(value: f64) -> String {
+    format!("{value:.2}")
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
+}
+
 fn finite(value: Option<f64>) -> Option<f64> {
     value.filter(|value| value.is_finite())
 }
@@ -370,6 +409,87 @@ mod tests {
         assert_eq!(percent_from_ratio(Some(80.0), Some(0.0)), None);
         assert_eq!(percent_from_ratio(Some(f64::NAN), Some(100.0)), None);
         assert_eq!(percent_from_ratio(None, Some(100.0)), None);
+    }
+
+    #[test]
+    fn auto_plan_spreads_the_gap_within_limits() {
+        assert_eq!(
+            auto_plan(4.0),
+            Some(AutoPlan {
+                runs: 1,
+                distance_km: 4.0
+            })
+        );
+        assert_eq!(
+            auto_plan(12.0),
+            Some(AutoPlan {
+                runs: 3,
+                distance_km: 4.0
+            })
+        );
+        assert_eq!(
+            auto_plan(21.0),
+            Some(AutoPlan {
+                runs: 5,
+                distance_km: 4.2
+            })
+        );
+        assert_eq!(
+            auto_plan(23.45),
+            Some(AutoPlan {
+                runs: 5,
+                distance_km: 4.69
+            })
+        );
+        assert_eq!(
+            auto_plan(15.0),
+            Some(AutoPlan {
+                runs: 3,
+                distance_km: 5.0
+            })
+        );
+        // 缺口太小也要留一条有效记录，单次距离不低于 1 km。
+        assert_eq!(
+            auto_plan(0.5),
+            Some(AutoPlan {
+                runs: 1,
+                distance_km: 1.0
+            })
+        );
+        // 缺口大到 30 次 × 5 km 也补不完时，按上限给出最接近的计划。
+        assert_eq!(
+            auto_plan(160.0),
+            Some(AutoPlan {
+                runs: 30,
+                distance_km: 5.0
+            })
+        );
+        assert_eq!(auto_plan(0.0), None);
+        assert_eq!(auto_plan(-3.0), None);
+        assert_eq!(auto_plan(f64::NAN), None);
+        assert_eq!(auto_plan(f64::INFINITY), None);
+    }
+
+    #[test]
+    fn auto_plan_covers_the_gap_it_reports() {
+        for remaining in [1.0, 3.3, 7.7, 9.99, 12.5, 23.45, 48.6, 99.99] {
+            let plan = auto_plan(remaining).expect("正数缺口应有计划");
+            assert!((1..=PLAN_MAX_RUNS).contains(&plan.runs));
+            assert!((PLAN_MIN_KM..=PLAN_MAX_KM).contains(&plan.distance_km));
+            assert!(
+                f64::from(plan.runs) * plan.distance_km >= remaining,
+                "{remaining} km 缺口被 {plan:?} 漏掉"
+            );
+        }
+    }
+
+    #[test]
+    fn plan_km_drops_trailing_zeros() {
+        assert_eq!(format_plan_km(4.0), "4");
+        assert_eq!(format_plan_km(4.5), "4.5");
+        assert_eq!(format_plan_km(4.25), "4.25");
+        assert_eq!(format_plan_km(1.0), "1");
+        assert_eq!(format_plan_km(5.0), "5");
     }
 
     #[test]

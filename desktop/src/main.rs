@@ -17,6 +17,7 @@ use sjturunningman::{
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::{
     cell::RefCell,
+    collections::HashSet,
     path::{Path, PathBuf},
     rc::Rc,
     sync::{
@@ -85,6 +86,12 @@ struct State {
     verification_attempts: u8,
     /// 每次登录或退出都递增，晚到的学期响应只有序号匹配才允许写界面。
     session_serial: u64,
+    /// 最近一次同步到的学期统计：已有记录的日期、学期起止、目标与已完成公里数。
+    stats: Option<stats::SemesterStats>,
+    /// 客户端自动填进输入框的（次数, 距离），用来分辨「用户手改过」。
+    auto_plan: Option<(String, String)>,
+    /// 只在登录 / 二次验证之后的那次学期响应里自动排计划，上传后的刷新不重排。
+    auto_adjust_pending: bool,
 }
 
 fn dispatch(sender: &mpsc::Sender<AppEvent>, ui: &slint::Weak<AppWindow>, event: AppEvent) {
@@ -153,6 +160,45 @@ fn spawn_stats_refresh(
             AppEvent::Stats(serial, session.semester_stats()),
         );
     });
+}
+
+/// 登录后的第一次学期数据用来按本学期缺口反推「次数 × 单次距离」。
+/// 用户已经手动改过默认值就不插手，只在日志里说明为什么没调整。
+fn auto_adjust_plan(ui: &AppWindow, state: &mut State, data: &stats::SemesterStats) {
+    let (Some(target), Some(done)) = (data.target_km, data.result_km) else {
+        log(ui, "服务器未返回本学期目标或已完成公里数，跑步计划保持不变");
+        return;
+    };
+    let remaining = target - done;
+    let Some(plan) = stats::auto_plan(remaining) else {
+        log(ui, "本学期没有待补的公里数，跑步计划保持不变");
+        return;
+    };
+    let current = (ui.get_runs().to_string(), ui.get_distance().to_string());
+    let defaults = Settings::default();
+    let untouched = current == (defaults.runs, defaults.distance);
+    let last_plan = state.auto_plan.clone();
+    if !untouched && last_plan.as_ref() != Some(&current) {
+        log(ui, "跑步次数 / 单次距离已被手动修改，保持你的设置");
+        return;
+    }
+    let runs = plan.runs.to_string();
+    let distance = stats::format_plan_km(plan.distance_km);
+    ui.set_runs(runs.clone().into());
+    ui.set_distance(distance.clone().into());
+    state.auto_plan = Some((runs, distance.clone()));
+    // 次数和距离都变了，上一条预览不再对应当前参数。
+    state.preview = None;
+    state.preview_inputs = None;
+    notify(
+        ui,
+        format!(
+            "已按本学期未完成 {} 自动设为 {} 次 × {} km",
+            stats::format_km(Some(remaining)),
+            plan.runs,
+            distance
+        ),
+    );
 }
 
 /// 系统里可能带 CJK 字形的字体文件，(家族名, 路径)，按优先级排列。
@@ -431,9 +477,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.set_dark(prefs.dark);
     ui.set_runs(prefs.runs.clone().into());
     ui.set_distance(prefs.distance.clone().into());
+    ui.set_skip_existing(prefs.skip_existing);
     ui.set_run_time(prefs.time.clone().into());
     ui.set_run_date(settings::yesterday().into());
     ui.set_version(format!("v{}", env!("APP_VERSION")).into());
+    // 上次是客户端自动填的计划就继续当作「没手改过」，用户自己改过的不会被动覆盖。
+    let auto_plan = if prefs.plan_auto {
+        Some((prefs.runs.clone(), prefs.distance.clone()))
+    } else {
+        None
+    };
     let state = Rc::new(RefCell::new(State {
         dir,
         maps: None,
@@ -449,6 +502,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         close_after_stop: false,
         verification_attempts: 0,
         session_serial: 0,
+        stats: None,
+        auto_plan,
+        auto_adjust_pending: false,
     }));
     if let Err(error) = reload_routes(&ui, &mut state.borrow_mut(), &prefs.route) {
         notify(&ui, error);
@@ -510,6 +566,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ui.set_logged_in(true);
                             ui.set_login_stage(0);
                             notify(&ui, "登录成功，会话仅保留在内存中");
+                            state.auto_adjust_pending = true;
                             state.session_serial += 1;
                             if let Some(session) = state.session.clone() {
                                 spawn_stats_refresh(session, state.session_serial, &tx, &weak);
@@ -543,6 +600,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ui.set_login_stage(0);
                             ui.set_two_factor_code("".into());
                             notify(&ui, "二次验证成功");
+                            state.auto_adjust_pending = true;
                             state.session_serial += 1;
                             if let Some(session) = state.session.clone() {
                                 spawn_stats_refresh(session, state.session_serial, &tx, &weak);
@@ -638,6 +696,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     match result {
                         Ok(data) => {
+                            let adjust = state.auto_adjust_pending;
+                            state.auto_adjust_pending = false;
+                            state.stats = Some(data.clone());
                             ui.set_semester_km(stats::format_km(data.result_km).into());
                             ui.set_semester_percent(stats::format_percent(data.percent).into());
                             match data.range {
@@ -651,8 +712,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                                 None => log(&ui, "服务器未返回本学期起止日期，日历保持占位"),
                             }
+                            if adjust {
+                                auto_adjust_plan(&ui, &mut state, &data);
+                            }
                         }
-                        Err(error) => log(&ui, &format!("学期数据同步失败：{error}")),
+                        Err(error) => {
+                            state.auto_adjust_pending = false;
+                            log(&ui, &format!("学期数据同步失败：{error}"));
+                        }
                     }
                 }
             }
@@ -931,6 +998,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             state.two_factor = None;
             state.user.clear();
             state.session_serial += 1;
+            state.stats = None;
+            state.auto_adjust_pending = false;
             ui.set_username("".into());
             ui.set_logged_in(false);
             ui.set_semester_km("--".into());
@@ -970,6 +1039,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return;
             }
         };
+        let occupied = state
+            .stats
+            .as_ref()
+            .map(|data| data.run_days.keys().copied().collect::<HashSet<_>>())
+            .unwrap_or_default();
+        let earliest = state
+            .stats
+            .as_ref()
+            .and_then(|data| data.range)
+            .map(|range| range.start);
+        let plan = match task::schedule(&config, ui.get_skip_existing(), &occupied, earliest) {
+            Ok(plan) => plan,
+            Err(error) => {
+                notify(&ui, error);
+                return;
+            }
+        };
+        if plan.dates.is_empty() {
+            notify(
+                &ui,
+                "设定次数内的日期都已有记录，可关闭「跳过已有记录的日期」或改用更早的结束日期",
+            );
+            return;
+        }
         state.cancel = Arc::new(AtomicBool::new(false));
         let cancel = state.cancel.clone();
         let user = state.user.clone();
@@ -980,9 +1073,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let tx = tx.clone();
         let weak = weak.clone();
         std::thread::spawn(move || {
-            if let Err(e) = task::run(&session, &route.points, &config, &user, &cancel, |event| {
-                dispatch(&tx, &weak, AppEvent::Task(event))
-            }) {
+            if let Err(e) = task::run(
+                &session,
+                &route.points,
+                &config,
+                &plan,
+                &user,
+                &cancel,
+                |event| dispatch(&tx, &weak, AppEvent::Task(event)),
+            ) {
                 dispatch(&tx, &weak, AppEvent::TaskError(e));
             }
         });
@@ -1084,6 +1183,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             route: selected(&state, &ui)
                 .map(|r| r.name)
                 .unwrap_or_else(|_| "default".into()),
+            skip_existing: ui.get_skip_existing(),
+            plan_auto: state.auto_plan.as_ref()
+                == Some(&(ui.get_runs().to_string(), ui.get_distance().to_string())),
         };
         if let Err(error) = settings::save(&state.dir, &settings) {
             eprintln!("{error}");

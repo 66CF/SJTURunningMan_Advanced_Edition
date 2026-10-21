@@ -3,9 +3,10 @@ use crate::{
     route::{self, Point},
     settings::RunConfig,
 };
-use chrono::{Duration, Local, TimeZone};
+use chrono::{Duration, Local, NaiveDate, TimeZone};
 use rand::Rng;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::Uuid;
 
@@ -27,6 +28,60 @@ pub enum Event {
         failed: u32,
         stopped: bool,
     },
+}
+
+/// 跳过已有记录时最多向前翻多少天，避免一路翻到学期之外。
+pub const MAX_LOOKBACK_DAYS: i64 = 120;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Schedule {
+    /// 实际要上传的日期，从「结束日期」向前排列。
+    pub dates: Vec<NaiveDate>,
+    /// 因为已经有记录而被跳过的日期。
+    pub skipped: Vec<NaiveDate>,
+    /// 向前翻到上限或学期起点仍未凑够设定的次数。
+    pub truncated: bool,
+}
+
+/// 决定这批记录落在哪些日期。开启「跳过已有记录」后仍然上传设定的次数，
+/// 只是把已有记录的那几天往后（更早）挪；关闭时保持原来的连续向前生成。
+pub fn schedule(
+    config: &RunConfig,
+    skip_existing: bool,
+    occupied: &HashSet<NaiveDate>,
+    earliest: Option<NaiveDate>,
+) -> Result<Schedule, String> {
+    let mut plan = Schedule {
+        dates: Vec::new(),
+        skipped: Vec::new(),
+        truncated: false,
+    };
+    if !skip_existing {
+        for index in 0..config.runs {
+            plan.dates.push(day_before(config.date, index as i64)?);
+        }
+        return Ok(plan);
+    }
+    let mut offset = 0i64;
+    while plan.dates.len() < config.runs as usize {
+        let date = day_before(config.date, offset)?;
+        if offset > MAX_LOOKBACK_DAYS || earliest.is_some_and(|start| date < start) {
+            plan.truncated = true;
+            break;
+        }
+        if occupied.contains(&date) {
+            plan.skipped.push(date);
+        } else {
+            plan.dates.push(date);
+        }
+        offset += 1;
+    }
+    Ok(plan)
+}
+
+fn day_before(date: NaiveDate, days: i64) -> Result<NaiveDate, String> {
+    date.checked_sub_signed(Duration::days(days))
+        .ok_or_else(|| "日期超出范围".into())
 }
 
 pub fn generate(
@@ -103,6 +158,7 @@ pub fn run(
     session: &Session,
     points: &[Point],
     config: &RunConfig,
+    plan: &Schedule,
     user: &str,
     cancel: &AtomicBool,
     emit: impl Fn(Event),
@@ -129,16 +185,44 @@ pub fn run(
         }
         Err(error) => return Err(error),
     };
+    if plan.dates.is_empty() {
+        emit(Event::Log("没有可上传的日期，任务结束".into()));
+        emit(Event::Finished {
+            success: 0,
+            failed: 0,
+            stopped: false,
+        });
+        return Ok(());
+    }
+    let total = plan.dates.len();
+    if !plan.skipped.is_empty() {
+        let shown = plan
+            .skipped
+            .iter()
+            .take(5)
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("、");
+        let more = if plan.skipped.len() > 5 {
+            format!(" 等 {} 天", plan.skipped.len())
+        } else {
+            String::new()
+        };
+        emit(Event::Log(format!("跳过已有记录的日期：{shown}{more}")));
+    }
+    if plan.truncated {
+        emit(Event::Log(format!(
+            "向前查找已到头，只找到 {total} 个可上传的日期（设定 {runs} 次）",
+            runs = config.runs
+        )));
+    }
     let mut success = 0;
     let mut failed = 0;
-    for index in 0..config.runs {
+    for (index, date) in plan.dates.iter().enumerate() {
         if stopped() {
             break;
         }
-        let date = config
-            .date
-            .checked_sub_signed(Duration::days(index as i64))
-            .ok_or("日期超出范围")?;
+        let date = *date;
         let offset = rand::rng().random_range(-10..=10) * 60 + rand::rng().random_range(-30..=30);
         let start = Local
             .from_local_datetime(&(date.and_time(config.time) + Duration::seconds(offset)))
@@ -148,7 +232,7 @@ pub fn run(
         emit(Event::Log(format!(
             "生成第 {}/{} 条记录 · {}",
             index + 1,
-            config.runs,
+            total,
             date
         )));
         let preview = generate(points, config, user, start, &rules)?;
@@ -158,8 +242,8 @@ pub fn run(
             break;
         }
         emit(Event::Progress(
-            ((index * 100 + 50) / config.runs) as i32,
-            format!("正在上传第 {}/{} 条", index + 1, config.runs),
+            ((index * 100 + 50) / total) as i32,
+            format!("正在上传第 {}/{} 条", index + 1, total),
         ));
         // POST 只发送一次，网络结果不确定时不自动重试，以免生成重复记录。
         match session.upload(&token, &payload) {
@@ -173,8 +257,8 @@ pub fn run(
             }
         }
         emit(Event::Progress(
-            ((index + 1) * 100 / config.runs) as i32,
-            format!("已处理 {}/{} 条", index + 1, config.runs),
+            ((index + 1) * 100 / total) as i32,
+            format!("已处理 {}/{} 条", index + 1, total),
         ));
     }
     emit(Event::Finished {
@@ -223,14 +307,86 @@ mod tests {
     fn cancelled_task_never_makes_network_request() {
         let session = Session::new().unwrap();
         let config = RunConfig::parse("1", "4", "2026-10-15", "08:00:00").unwrap();
+        let plan = schedule(&config, true, &HashSet::new(), None).unwrap();
         run(
             &session,
             &[],
             &config,
+            &plan,
             "",
             &AtomicBool::new(true),
             |event| assert!(matches!(event, Event::Finished { stopped: true, .. })),
         )
         .unwrap();
+    }
+
+    fn day(text: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap()
+    }
+
+    fn days(spec: &[&str]) -> Vec<NaiveDate> {
+        spec.iter().map(|text| day(text)).collect()
+    }
+
+    fn occupied(spec: &[&str]) -> HashSet<NaiveDate> {
+        days(spec).into_iter().collect()
+    }
+
+    #[test]
+    fn schedule_keeps_the_plain_backfill_when_skip_is_off() {
+        let config = RunConfig::parse("3", "4", "2026-10-15", "08:00:00").unwrap();
+        let plan = schedule(&config, false, &occupied(&["2026-10-15"]), None).unwrap();
+        assert_eq!(
+            plan.dates,
+            days(&["2026-10-15", "2026-10-14", "2026-10-13"])
+        );
+        assert!(plan.skipped.is_empty());
+        assert!(!plan.truncated);
+    }
+
+    #[test]
+    fn schedule_still_uploads_the_requested_count_by_moving_earlier() {
+        let config = RunConfig::parse("3", "4", "2026-10-15", "08:00:00").unwrap();
+        let plan = schedule(
+            &config,
+            true,
+            &occupied(&["2026-10-15", "2026-10-13"]),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            plan.dates,
+            days(&["2026-10-14", "2026-10-12", "2026-10-11"])
+        );
+        assert_eq!(plan.skipped, days(&["2026-10-15", "2026-10-13"]));
+        assert!(!plan.truncated);
+    }
+
+    #[test]
+    fn schedule_stops_at_the_semester_start() {
+        let config = RunConfig::parse("3", "4", "2026-10-02", "08:00:00").unwrap();
+        let taken = occupied(&["2026-10-02", "2026-10-01"]);
+        let plan = schedule(&config, true, &taken, Some(day("2026-09-25"))).unwrap();
+        assert_eq!(
+            plan.dates,
+            days(&["2026-09-30", "2026-09-29", "2026-09-28"])
+        );
+        assert!(!plan.truncated);
+        // 学期只剩两天可跑时如实报告不足，不会跑到学期之外。
+        let plan = schedule(&config, true, &taken, Some(day("2026-09-29"))).unwrap();
+        assert_eq!(plan.dates, days(&["2026-09-30", "2026-09-29"]));
+        assert!(plan.truncated);
+    }
+
+    #[test]
+    fn schedule_bounds_the_lookback() {
+        let config = RunConfig::parse("3", "4", "2026-10-15", "08:00:00").unwrap();
+        let taken: HashSet<NaiveDate> = (0..=200)
+            .map(|offset| day_before(config.date, offset).unwrap())
+            .collect();
+        let plan = schedule(&config, true, &taken, None).unwrap();
+        assert!(plan.dates.is_empty());
+        assert!(plan.truncated);
+        assert_eq!(plan.skipped.len(), (MAX_LOOKBACK_DAYS + 1) as usize);
     }
 }
