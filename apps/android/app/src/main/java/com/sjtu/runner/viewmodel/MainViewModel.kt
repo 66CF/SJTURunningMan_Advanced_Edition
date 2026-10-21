@@ -1,6 +1,8 @@
 package com.sjtu.runner.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
 import android.webkit.CookieManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +15,18 @@ import com.sjtu.runner.network.ApiService
 import com.sjtu.runner.network.PointRules
 import com.sjtu.runner.route.RouteInfo
 import com.sjtu.runner.route.RouteManager
+import com.sjtu.runner.stats.AutoPlan
+import com.sjtu.runner.stats.CalendarWeek
+import com.sjtu.runner.stats.SemesterStats
+import com.sjtu.runner.stats.autoPlan
+import com.sjtu.runner.stats.buildSchedule
+import com.sjtu.runner.stats.calendarWeeks
+import com.sjtu.runner.stats.formatKm
+import com.sjtu.runner.stats.formatPercent
+import com.sjtu.runner.stats.formatPlanKm
+import com.sjtu.runner.stats.formatSkippedDays
+import com.sjtu.runner.stats.placeholderWeeks
+import com.sjtu.runner.stats.todayCst
 import com.sjtu.runner.utils.GpsUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +42,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.random.Random
 
+private const val PREFS = "app_prefs"
+private const val KEY_SKIP_EXISTING = "skip_existing"
+private const val KEY_PLAN_AUTO_ACTIVE = "plan_auto_active"
+private const val KEY_PLAN_AUTO_DAYS = "plan_auto_days"
+private const val KEY_PLAN_AUTO_DISTANCE = "plan_auto_distance"
+
 data class RunConfig(
     val days: Int = 1,
     val distanceKm: Double = AppConfig.DEFAULT_DISTANCE_KM,
@@ -36,6 +56,27 @@ data class RunConfig(
     val second: Int = AppConfig.DEFAULT_RUN_SECOND,
     val startDate: LocalDate = LocalDate.now().minusDays(1),
     val routeDecision: RouteDecision? = null
+)
+
+/** 顶部浮层提示：`id` 变化才重播动画，5 秒后由界面主动 `clearNotice`。 */
+data class Notice(
+    val id: Long,
+    val text: String
+)
+
+/** 「本学期进度」与「学期日历」的展示数据，未登录时保留占位日历。 */
+data class SemesterView(
+    val loggedIn: Boolean = false,
+    val kmText: String = "--",
+    val percentText: String = "--",
+    val weeks: List<CalendarWeek> = emptyList()
+)
+
+/** 自动排计划的一次生效记录，`token` 保证同样的数值也能被界面重新应用。 */
+data class AutoPlanApplied(
+    val runs: Int,
+    val distanceKm: Double,
+    val token: Long
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -69,11 +110,157 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _reloginRequired = MutableStateFlow(false)
     val reloginRequired: StateFlow<Boolean> = _reloginRequired
 
+    private val _loggedIn = MutableStateFlow(false)
+    val loggedIn: StateFlow<Boolean> = _loggedIn
+
+    private val _semester = MutableStateFlow(SemesterView(weeks = placeholderWeeks(todayCst())))
+    val semester: StateFlow<SemesterView> = _semester
+
+    private val _notice = MutableStateFlow<Notice?>(null)
+    val notice: StateFlow<Notice?> = _notice
+
+    private val _skipExisting = MutableStateFlow(true)
+    val skipExisting: StateFlow<Boolean> = _skipExisting
+
+    private val _autoPlanApplied = MutableStateFlow<AutoPlanApplied?>(null)
+    val autoPlanApplied: StateFlow<AutoPlanApplied?> = _autoPlanApplied
+
     private var job: Job? = null
     private var previewJob: Job? = null
 
+    /** 最近一次成功的学期数据，用于「跳过已有记录的日期」和自动排计划。 */
+    private var stats: SemesterStats? = null
+
+    /** 换账号 / 重新登录后递增，迟到的统计响应据此丢弃。 */
+    private var sessionSerial = 0L
+    private var autoAdjustPending = false
+    private var noticeSerial = 0L
+    private var autoPlanToken = 0L
+    private var lastAppliedPlan: AutoPlan? = null
+
     init {
         loadRoutes()
+        restorePrefs()
+        if (CookieManager.getInstance().getCookie("https://jaccount.sjtu.edu.cn")?.contains("JAAuthCookie") == true) {
+            _loggedIn.value = true
+            refreshSemesterStats()
+        }
+    }
+
+    // ------------------------------------------------------------ semester stats
+
+    /** 登录页返回成功后调用：换会话、拉学期数据，并允许按缺口调整计划。 */
+    fun onLoginSucceeded() {
+        sessionSerial += 1
+        autoAdjustPending = true
+        _reloginRequired.value = false
+        _loggedIn.value = true
+        refreshSemesterStats()
+    }
+
+    fun refreshSemesterStats() {
+        val serial = sessionSerial
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { api.semesterStats() } }
+            if (serial != sessionSerial) return@launch
+            result.onSuccess { data -> applyStats(data) }
+                .onFailure { e ->
+                    autoAdjustPending = false
+                    logMsg(LogLevel.ERROR, "学期数据同步失败：${e.message ?: e.javaClass.simpleName}")
+                }
+        }
+    }
+
+    private fun applyStats(data: SemesterStats) {
+        stats = data
+        val weeks = data.range?.let { calendarWeeks(it, data.runDays) }
+        _semester.value = SemesterView(
+            loggedIn = true,
+            kmText = formatKm(data.resultKm),
+            percentText = formatPercent(data.percent),
+            weeks = weeks ?: placeholderWeeks(todayCst())
+        )
+        if (weeks != null) {
+            logMsg(LogLevel.INFO, "学期数据已同步 · ${data.runDays.size} 天有记录")
+        } else {
+            logMsg(LogLevel.INFO, "服务器未返回本学期起止日期，日历保持占位")
+        }
+        if (autoAdjustPending) {
+            autoAdjustPending = false
+            autoAdjustPlan(data)
+        }
+    }
+
+    /** 登录后的第一次学期数据用来按本学期缺口反推「次数 × 单次距离」（与电脑版一致）。 */
+    private fun autoAdjustPlan(data: SemesterStats) {
+        val target = data.targetKm?.takeIf { it.isFinite() }
+        val done = data.resultKm?.takeIf { it.isFinite() }
+        if (target == null || done == null) {
+            logMsg(LogLevel.INFO, "服务器未返回本学期目标或已完成公里数，跑步计划保持不变")
+            return
+        }
+        val remaining = target - done
+        val plan = autoPlan(remaining)
+        if (plan == null) {
+            logMsg(LogLevel.INFO, "本学期没有待补的公里数，跑步计划保持不变")
+            return
+        }
+        val defaults = RunConfig()
+        val untouched = currentConfig.days == defaults.days && currentConfig.distanceKm == defaults.distanceKm
+        val lastPlan = lastAppliedPlan
+        if (!untouched && lastPlan != AutoPlan(currentConfig.days, currentConfig.distanceKm)) {
+            logMsg(LogLevel.INFO, "跑步次数 / 单次距离已被手动修改，保持你的设置")
+            return
+        }
+        lastAppliedPlan = plan
+        prefs().edit()
+            .putInt(KEY_PLAN_AUTO_DAYS, plan.runs)
+            .putString(KEY_PLAN_AUTO_DISTANCE, formatPlanKm(plan.distanceKm))
+            .putBoolean(KEY_PLAN_AUTO_ACTIVE, true)
+            .apply()
+        // 次数和距离都变了，上一条预览不再对应当前参数。
+        _preview.value = null
+        autoPlanToken += 1
+        _autoPlanApplied.value = AutoPlanApplied(plan.runs, plan.distanceKm, autoPlanToken)
+        notify(
+            "已按本学期未完成 ${formatKm(remaining)} 自动设为 ${plan.runs} 次 × ${formatPlanKm(plan.distanceKm)} km"
+        )
+    }
+
+    // ------------------------------------------------------------- persisted prefs
+
+    private fun prefs(): SharedPreferences =
+        getApplication<Application>().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun restorePrefs() {
+        val store = prefs()
+        _skipExisting.value = store.getBoolean(KEY_SKIP_EXISTING, true)
+        if (!store.getBoolean(KEY_PLAN_AUTO_ACTIVE, false)) return
+        val runs = store.getInt(KEY_PLAN_AUTO_DAYS, 0)
+        val distance = store.getString(KEY_PLAN_AUTO_DISTANCE, null)?.toDoubleOrNull()
+        if (runs in 1..AppConfig.MAX_RUN_TIMES && distance != null && distance.isFinite()) {
+            lastAppliedPlan = AutoPlan(runs, distance)
+            autoPlanToken += 1
+            _autoPlanApplied.value = AutoPlanApplied(runs, distance, autoPlanToken)
+        }
+    }
+
+    fun setSkipExisting(value: Boolean) {
+        _skipExisting.value = value
+        prefs().edit().putBoolean(KEY_SKIP_EXISTING, value).apply()
+    }
+
+    // ------------------------------------------------------------------ notice
+
+    /** 浮层提示 + 日志各一份，和电脑版 `notify` 一样不会只留一处。 */
+    private fun notify(message: String) {
+        noticeSerial += 1
+        _notice.value = Notice(noticeSerial, message)
+        logMsg(LogLevel.INFO, message)
+    }
+
+    fun clearNotice() {
+        _notice.value = null
     }
 
     // ---------------------------------------------------------------- routes
@@ -151,7 +338,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (_running.value) return
 
         validate(config)?.let { message ->
-            logMsg(LogLevel.ERROR, "配置错误: $message")
+            notify(message)
             return
         }
 
@@ -208,20 +395,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun runUpload(config: RunConfig) {
+        // 上传前先决定这批记录落在哪些日期：已有记录的那几天挪到更早的日期。
+        val schedule = buildSchedule(
+            endDate = config.startDate,
+            runs = config.days,
+            skipExisting = _skipExisting.value,
+            occupied = stats?.runDays?.keys?.toSet() ?: emptySet(),
+            earliest = stats?.range?.start
+        )
+        if (schedule.dates.isEmpty()) {
+            notify("设定次数内的日期都已有记录，可关闭「跳过已有记录的日期」或改用更早的结束日期")
+            return
+        }
+        val total = schedule.dates.size
+
         _reloginRequired.value = false
         job = viewModelScope.launch(Dispatchers.IO) {
             _running.value = true
-            _progress.value = TaskProgress(0, config.days, TaskStatus.PREPARING)
+            _notice.value = null
+            _progress.value = TaskProgress(0, total, TaskStatus.PREPARING)
 
             try {
                 val route = _selectedRoute.value ?: error("未选择路线")
                 logMsg(LogLevel.INFO, "使用路线: ${route.name}")
 
+                formatSkippedDays(schedule.skipped).takeIf { it.isNotEmpty() }?.let {
+                    logMsg(LogLevel.INFO, it)
+                }
+                if (schedule.truncated) {
+                    logMsg(
+                        LogLevel.INFO,
+                        "向前查找已到头，只找到 $total 个可上传的日期（设定 ${config.days} 次）"
+                    )
+                }
+
                 logMsg(LogLevel.INFO, "步骤 1/2: 获取认证...")
                 val coordinates = currentRouteCoordinates()
                 if (coordinates.size < 2) {
                     logMsg(LogLevel.ERROR, "路线坐标为空，请选择其他路线")
-                    _progress.value = TaskProgress(0, config.days, TaskStatus.FAILED)
+                    _progress.value = TaskProgress(0, total, TaskStatus.FAILED)
                     return@launch
                 }
                 logMsg(LogLevel.INFO, "路线点数量: ${coordinates.size}")
@@ -229,13 +441,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val uid = api.getUid()
                 if (uid == null) {
                     logMsg(LogLevel.ERROR, "UID 获取失败，cookie 可能已过期")
-                    _progress.value = TaskProgress(0, config.days, TaskStatus.FAILED)
+                    _progress.value = TaskProgress(0, total, TaskStatus.FAILED)
                     triggerRelogin()
                     return@launch
                 }
                 logMsg(LogLevel.SUCCESS, "UID 获取成功")
 
-                _progress.value = TaskProgress(0, config.days, TaskStatus.AUTHENTICATING)
+                _progress.value = TaskProgress(0, total, TaskStatus.AUTHENTICATING)
                 val rules = api.getPointRules(uid, AppConfig.START_LONGITUDE, AppConfig.START_LATITUDE)
                 logMsg(
                     LogLevel.INFO,
@@ -248,16 +460,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 var successCount = 0
                 var failCount = 0
 
-                for (i in 0 until config.days) {
+                for ((i, date) in schedule.dates.withIndex()) {
                     if (!_running.value) break
 
-                    val startDateTime = baseStartDateTime(config, i)
+                    val startDateTime = baseStartDateTime(config, date)
                     logMsg(
                         LogLevel.INFO,
-                        "生成第 ${i + 1}/${config.days} 条数据 (${startDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))})"
+                        "生成第 ${i + 1}/$total 条数据 (${startDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))})"
                     )
 
-                    _progress.value = TaskProgress(i, config.days, TaskStatus.GENERATING)
+                    _progress.value = TaskProgress(i, total, TaskStatus.GENERATING)
                     val outcome = DataGenerator.generate(
                         coordinates = coordinates,
                         userId = uid,
@@ -268,37 +480,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         truncateToTarget = config.routeDecision != RouteDecision.FULL_ROUTE,
                         log = { level, msg -> logMsg(level, msg) }
                     )
-                    publishPreview(outcome, route.name, "待上传", i + 1, config.days)
+                    publishPreview(outcome, route.name, "待上传", i + 1, total)
                     logMsg(
                         LogLevel.INFO,
                         "实际距离 ${String.format("%.2f", outcome.distanceM / 1000.0)}km / ${outcome.durationSec / 60}min / ${outcome.pointCount}点"
                     )
 
-                    _progress.value = TaskProgress(i, config.days, TaskStatus.UPLOADING)
+                    _progress.value = TaskProgress(i, total, TaskStatus.UPLOADING)
                     val result = api.upload(uid, outcome.payload)
                     if (result.success) {
                         successCount++
-                        logMsg(LogLevel.SUCCESS, "第 ${i + 1}/${config.days} 条上传成功")
-                        publishPreview(outcome, route.name, "已上传", i + 1, config.days)
+                        logMsg(LogLevel.SUCCESS, "第 ${i + 1}/$total 条上传成功")
+                        publishPreview(outcome, route.name, "已上传", i + 1, total)
                     } else if (result.needRelogin) {
                         logMsg(LogLevel.ERROR, "上传失败: ${result.message}")
-                        _progress.value = TaskProgress(i + 1, config.days, TaskStatus.FAILED)
+                        _progress.value = TaskProgress(i + 1, total, TaskStatus.FAILED)
                         triggerRelogin()
                         break
                     } else {
                         failCount++
                         logMsg(LogLevel.ERROR, "第 ${i + 1} 条失败: ${result.message}")
-                        publishPreview(outcome, route.name, "上传失败", i + 1, config.days)
+                        publishPreview(outcome, route.name, "上传失败", i + 1, total)
                     }
 
-                    _progress.value = TaskProgress(i + 1, config.days, TaskStatus.UPLOADING)
+                    _progress.value = TaskProgress(i + 1, total, TaskStatus.UPLOADING)
                 }
 
                 if (_running.value) {
                     val finished = failCount == 0
                     _progress.value = TaskProgress(
                         successCount + failCount,
-                        config.days,
+                        total,
                         if (finished) TaskStatus.FINISHED else TaskStatus.FAILED
                     )
                     logMsg(
@@ -307,6 +519,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 } else {
                     logMsg(LogLevel.WARN, "任务已手动停止")
+                }
+
+                // 上传成功之后当天才算得上数，顺手刷新一次日历（不再触发自动排计划）。
+                if (successCount > 0) {
+                    sessionSerial += 1
+                    refreshSemesterStats()
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 logMsg(LogLevel.WARN, "任务已手动停止")
@@ -449,16 +667,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 以所选日期为最新一条记录向前生成，并加入 ±10 分钟 / ±30 秒随机波动。 */
-    private fun baseStartDateTime(config: RunConfig, index: Int): LocalDateTime {
-        val base = config.startDate
+    /** 记录落在排好的日期上，并加入 ±10 分钟 / ±30 秒随机波动。 */
+    private fun baseStartDateTime(config: RunConfig, date: LocalDate): LocalDateTime {
+        val base = date
             .atTime(config.hour, config.minute, config.second)
             .plusMinutes(Random.nextLong(-10, 11))
             .plusSeconds(Random.nextLong(-30, 31))
-        return base.minusDays(index.toLong())
+        return base
     }
 
     private fun triggerRelogin() {
+        // 会话已经作废：日历回到占位，迟到的统计响应也会被 sessionSerial 挡掉。
+        sessionSerial += 1
+        stats = null
+        autoAdjustPending = false
+        _loggedIn.value = false
+        _semester.value = SemesterView(weeks = placeholderWeeks(todayCst()))
         _reloginRequired.value = true
         viewModelScope.launch(Dispatchers.Main) {
             CookieManager.getInstance().removeAllCookies(null)

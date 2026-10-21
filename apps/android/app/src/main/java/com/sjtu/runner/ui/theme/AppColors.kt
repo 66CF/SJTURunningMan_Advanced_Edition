@@ -16,7 +16,11 @@ data class AppColors(
     val success: Color,
     val warning: Color,
     val gradientStart: Color,
-    val gradientEnd: Color
+    val gradientEnd: Color,
+    val runValid: Color,
+    val runInvalid: Color,
+    val calendarEmpty: Color,
+    val calendarInk: Color
 )
 
 val LocalAppColors = staticCompositionLocalOf {
@@ -30,7 +34,11 @@ val LocalAppColors = staticCompositionLocalOf {
         success = SuccessGreen,
         warning = WarningYellow,
         gradientStart = Color(0xFFC9E7FA),
-        gradientEnd = SurfaceLight
+        gradientEnd = SurfaceLight,
+        runValid = RunValidLight,
+        runInvalid = RunInvalidLight,
+        calendarEmpty = CalendarEmptyLight,
+        calendarInk = CalendarInkLight
     )
 }
 
@@ -44,7 +52,11 @@ val LightAppColors = AppColors(
     success = SuccessGreen,
     warning = WarningYellow,
     gradientStart = Color(0xFFD6ECFB),
-    gradientEnd = SurfaceLight
+    gradientEnd = SurfaceLight,
+    runValid = RunValidLight,
+    runInvalid = RunInvalidLight,
+    calendarEmpty = CalendarEmptyLight,
+    calendarInk = CalendarInkLight
 )
 
 val DarkAppColors = AppColors(
@@ -57,5 +69,9 @@ val DarkAppColors = AppColors(
     success = SuccessGreenDark,
     warning = WarningYellow,
     gradientStart = Color(0xFF12293A),
-    gradientEnd = SurfaceDark
+    gradientEnd = SurfaceDark,
+    runValid = RunValidDark,
+    runInvalid = RunInvalidDark,
+    calendarEmpty = CalendarEmptyDark,
+    calendarInk = CalendarInkDark
 )

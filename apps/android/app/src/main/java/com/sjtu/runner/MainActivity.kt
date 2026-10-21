@@ -38,6 +38,8 @@ class MainActivity : ComponentActivity() {
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             logMsg("重新登录成功，重新加载界面...")
+            // 换过账号了：递增会话序号、拉学期数据，并允许按学期缺口调整计划。
+            viewModel.onLoginSucceeded()
             setContent {
                 AppContent()
             }

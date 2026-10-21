@@ -37,3 +37,13 @@ val ConsoleLight = Color(0xFF10151C)
 val ConsoleOnLight = Color(0xFFD7E3EE)
 val ConsoleDark = Color(0xFF080C11)
 val ConsoleOnDark = Color(0xFFC9D6E2)
+
+// 学期日历：与电脑版 app.slint 的 Theme 取值一致
+val RunValidLight = Color(0xFFA9DCB5)
+val RunValidDark = Color(0xFF4F9C68)
+val RunInvalidLight = Color(0xFFDCECD9)
+val RunInvalidDark = Color(0xFF2F5C43)
+val CalendarEmptyLight = Color(0xFFEEF2EF)
+val CalendarEmptyDark = Color(0xFF26362E)
+val CalendarInkLight = Color(0xFF1C3327)
+val CalendarInkDark = Color(0xFFDCEBE0)

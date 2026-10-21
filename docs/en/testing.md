@@ -31,6 +31,8 @@ Existing cases:
 | --- | --- |
 | `app/src/test/java/com/sjtu/runner/data/DataGeneratorTest.kt` | Route distance correction, truncate mode reaching target, full-loop mode, over-long route truncation, pace clamped to rules, payload matching the upload schema |
 | `app/src/test/java/com/sjtu/runner/update/UpdateCheckerTest.kt` | Version parsing (prefix / prerelease), newer tag detected, older/equal ignored |
+| `app/src/test/java/com/sjtu/runner/stats/SemesterStatsTest.kt` | Semester range validity, calendar week splitting (Monday-first, month title only on the first row), counted / invalid / no-run states and "counted is never overwritten", completion-rate and kilometre formatting, plan derived from the semester gap |
+| `app/src/test/java/com/sjtu/runner/stats/RunScheduleTest.kt` | Continuous backwards generation when skipping is off, already-recorded days moved earlier with the count unchanged when it is on, the 120-day and semester-start bounds, skipped-day log wording |
 
 ### Instrumented tests (device or emulator)
 
@@ -45,6 +47,22 @@ Case: `app/src/androidTest/java/com/sjtu/runner/AppInstrumentedTest.kt`.
 
 - Pure logic (data generation, version compare, coordinate math) → `app/src/test/`, JUnit 4.
 - Anything needing a Context or UI → `app/src/androidTest/`, AndroidX JUnit + Espresso / Compose Test.
+
+### Semester data manual acceptance (device, valid account required)
+
+Automated tests only cover pure logic (semester range, calendar states, date scheduling). Check these on a device:
+
+- [ ] Not logged in: "本学期进度" shows `--` and "学期日历" is a placeholder calendar saying "服务器未返回本学期起止日期。"
+- [ ] After a successful login both cards sync automatically with no manual refresh; after logging out they return to `--` and the placeholder calendar
+- [ ] The calendar distinguishes counted (solid green), invalid (outlined) and no-run (grey) days, days outside the semester are blank cells, weeks start on Monday
+- [ ] A failed semester sync logs one line, leaves the login state untouched and never logs you out
+- [ ] The first sync after login fills "run count × distance per run" from the semester gap; once you edit either value by hand the plan is no longer rearranged and the log says why
+- [ ] Auto-filled count and distance survive a restart
+- [ ] With "skip days that already have a record" on, recorded days move to earlier dates and the count still equals what was configured; with it off, dates are generated continuously backwards from the end date
+- [ ] Overlay notices collapse after 5 seconds without pushing content below down; the same text stays in the Task log
+- [ ] On other tabs the compact running bar can stop the task, and nothing further is sent after stopping
+- [ ] Contrast of the three calendar states and card colors is correct in both light and dark themes
+- [ ] Logs and preferences contain no cookie, uid or server response body
 
 ---
 
