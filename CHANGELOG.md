@@ -2,14 +2,16 @@
 
 按版本倒序记录。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-> **关于版本号**：一次发布用一个版本号，覆盖当次涉及的平台 —— 所以同一个版本号下的条目会分属不同平台，每条都用 **粗体标出平台**。各平台**当前**版本号的唯一来源仍是各自的配置文件：电脑版 `desktop/Cargo.toml`（旧版 Qt 客户端为 `src/config.py`）、安卓 `apps/android/app/build.gradle.kts`、鸿蒙 `apps/harmonyos/AppScope/app.json5`、iOS `apps/ios/SJTURunningMan.xcodeproj/project.pbxproj`。
+> **关于版本号**：一次发布用一个版本号，覆盖当次涉及的平台 —— 所以同一个版本号下的条目会分属不同平台，每条都用 **粗体标出平台**。各平台**当前**版本号的唯一来源仍是各自的配置文件：电脑版 `desktop/Cargo.toml`（保留的旧 Python 模块为 `src/config.py`）、安卓 `apps/android/app/build.gradle.kts`、鸿蒙 `apps/harmonyos/AppScope/app.json5`、iOS `apps/ios/SJTURunningMan.xcodeproj/project.pbxproj`。
 
 ### v4.5.0 — 未发布
 
-- **电脑版** — **改用 Rust + Slint 原生桌面客户端**：`desktop/` 重写界面与业务实现，不再依赖 Python、Qt 或 WebView；发布产物改为 Windows exe、macOS universal app/DMG、Linux amd64 / arm64 deb。旧 `qtui.py` 与 `src/` 保留作迁移对照，默认构建与打包已切换。
+- **电脑版** — **改用 Rust + Slint 原生桌面客户端**：`desktop/` 重写界面与业务实现，不再依赖 Python、Qt 或 WebView；发布产物改为 Windows exe、macOS universal app/DMG、Linux amd64 / arm64 deb。旧 `src/` 保留作迁移对照，默认构建与打包已切换。
 - **电脑版** — **路线与凭据处理调整**：导入的路线副本改存系统用户数据目录（旧程序目录里的 `Routes/`、`user.txt` 不再自动读取，需重新导入）；参数、日志与截图不落盘，账号、密码、验证码与 Cookie 只保留在内存。
 - **电脑版** — **地图预览改由仅监听 `127.0.0.1` 的本机页面提供**：地图页默认百度地图，可在页面内切换 OpenStreetMap；浏览器可正常发送 OSM 要求的来源信息，不再用 `file://` 打开，避免底图 403；刷新地图需保持客户端运行。
+- **电脑版** — **新增只读学期数据展示**：首页「跑步计划」下方增加「本学期进度」卡片，显示当前学期的达标公里与完成率；「任务日志」改为学期日历 + 运行日志双栏，日历区分计入成绩、无效记录与未跑。登录、二次验证或成功上传后自动后台同步，未登录显示 `--` 与占位日历，同步失败只提示一行日志且不改变登录状态，统计与打卡记录不落盘。
 - **电脑版 / iOS** — **版本号对齐**：电脑版 `v4.4.0` → `v4.5.0`，iOS `MARKETING_VERSION` `1.0` → `4.5.0`，与安卓一致。
+- **仓库** — **移除旧 Qt 入口 `qtui.py` 与 `main.spec`**：默认构建与发布早已切换到 Rust，旧入口和它的 PyInstaller 配置不再被使用，`main.spec` 的入口也正是 `qtui.py`。`src/` 与 `utils/` 保留作迁移对照，`ci-python.yml` 改为只检查这些模块（界面导入冒烟改跑 `src.info_dialog`）。文档新增「从源码运行 / Run from source」说明：克隆仓库后 `cargo run --locked -p sjturunningman` 即可，无需安装包、Python 或 Qt。
 
 ### v4.4.3 — 2026-10-13
 

@@ -52,7 +52,7 @@ Case: `app/src/androidTest/java/com/sjtu/runner/AppInstrumentedTest.kt`.
 
 Run `cargo test --workspace --locked`, `cargo fmt --all -- --check`, and `cargo clippy --workspace --all-targets --locked -- -D warnings`.
 
-Run the Release executable with `--smoke-test target/smoke` to verify offline preview, invalid input, clearing logs, and opening a dropdown by mouse, selecting with arrow keys, confirming, and disabling it. It saves 28 screenshots: 16 combinations of four pages, two themes, and normal/minimum window sizes, plus consent, four modal types, progress/cross-page Stop, empty/long logs, wrapped notices, and dropdown interactions. It uses isolated local data, never logs in, and never uploads.
+Run the Release executable with `--smoke-test target/smoke` to verify offline preview, invalid input, clearing logs, and opening a dropdown by mouse, selecting with arrow keys, confirming, and disabling it. It saves 30 screenshots: 16 combinations of four pages, two themes, and normal/minimum window sizes, plus consent, four modal types, progress/cross-page Stop, empty/long logs, wrapped notices, dropdown interactions, and the semester progress card and semester calendar under a statistics fixture (counts toward score, invalid record, rest day, and blank out-of-range cells). The statistics and calendar use fixed fixture values rather than real account data. It uses isolated local data, never logs in, and never uploads; `smoke-result.json` records the actual screenshot count and fixture row count.
 
 For online maps, run `--map-smoke-test target/map-smoke`. Production UI callbacks prepare the default track and planner, writing `preview-url.txt` and `planner-url.txt` to that directory. Keep the test window running and open the URLs in a browser. Check tile HTTP 200, the actual loopback Referer, attribution, and TXT export. In an isolated browser, intercept tiles with HTTP 403: a failure message must appear while retaining the track, without retry loops. This mode never logs in or uploads. Closing the window stops the service; old URLs no longer reload.
 
@@ -63,9 +63,13 @@ For online maps, run `--map-smoke-test target/map-smoke`. Production UI callback
 - [ ] Offline actual-track preview includes the legacy 200 m compensation; open routes reverse, closed routes loop; original gaps over 150 m are flagged.
 - [ ] Browser-map endpoints match the preview; planner-exported TXT can be imported.
 - [ ] With a valid account, automatic CAPTCHA recognition and app/email/SMS verification work, including refresh and manual fallback after recognition failure.
+- [ ] After login, the semester progress card and semester calendar refresh automatically; while logged out or after a failed refresh both stay on placeholders, and logout restores them.
+- [ ] The semester calendar distinguishes records that count toward the score (solid green), invalid records (outlined), and rest days (grey); dates outside the semester are blank cells, and the calendar/log halves do not overflow at the 1040×700 minimum window.
+- [ ] A failed semester-data refresh reports one log line only and leaves the login state unchanged.
 - [ ] During an authorized live acceptance run, progress and outcomes are accurate; failed POST requests are not retried automatically.
 - [ ] Stop and close prevent further records; an in-flight HTTP request can take up to 15 seconds; the UI remains responsive.
 - [ ] Logout clears the session; preferences, logs, and screenshots contain no real credentials.
+- [ ] Logs and `smoke-result.json` from the semester statistics contain no cookies, uid, or server response bodies.
 - [ ] Updates are checked on demand; network failures are reported.
 - [ ] Windows exe has the expected icon/version, works away from assets, and requires no Python/Qt/MSYS2 DLLs.
 - [ ] macOS Intel/ARM targets combine into a universal app; DMG contains app and Applications link; validate on both architectures.

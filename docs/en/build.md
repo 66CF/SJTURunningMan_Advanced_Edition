@@ -13,6 +13,18 @@ The four platforms build independently. Build only the one you changed.
 
 ## Desktop
 
+### Run from source
+
+To just run the desktop client without building an installer:
+
+```bash
+git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
+cd SJTURunningMan_Advanced_Edition
+cargo run --locked -p sjturunningman
+```
+
+Requires Rust 1.95+ (install stable with `rustup`) and a native C/C++ linker toolchain; running the desktop client needs no Python, Qt, or WebView. Per-OS dependencies are listed in the next section. The first launch still requires accepting the usage pledge.
+
 ### Native desktop
 
 ```bash
@@ -44,7 +56,7 @@ python3 scripts/package_desktop.py linux --binary target/release/sjturunningman 
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` takes `package.version` from `desktop/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The old `qtui.py`, `main.spec`, and `requirements.txt` remain for comparison and are slated for removal once the native client has been validated.
+`APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` takes `package.version` from `desktop/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The legacy `src/`, `utils/`, and `requirements.txt` remain for comparison (the old Qt entry point `qtui.py` and `main.spec` have been removed) and are slated for retirement once validation is stable.
 
 ### Desktop checks and release builds
 

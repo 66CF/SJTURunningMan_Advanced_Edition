@@ -41,7 +41,7 @@ Windows 核对文件来源后可从「更多信息」进入相应启动选项；
 
 ### 打包出来的 exe 没有图标
 
-使用 `build_windows.ps1` 构建原生 exe，图标由 `desktop/build.rs` 内嵌。旧 PyInstaller 命令不构建 Rust 客户端。
+使用 `build_windows.ps1` 构建原生 exe，图标由 `desktop/build.rs` 内嵌。仓库已不再提供 PyInstaller 配置，旧的打包命令也无法构建 Rust 客户端。
 
 ### 导入的路线重启后不见了
 
