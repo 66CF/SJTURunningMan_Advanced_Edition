@@ -206,6 +206,7 @@ component Option inherits Rectangle {
     forward-focus: focus;
     option-content := HorizontalLayout {
         padding-left: 12px; padding-right: 12px; spacing: 9px; alignment: start;
+        cross-axis-alignment: center;
         Rectangle {
             width: 18px; height: 18px; border-radius: 5px;
             background: root.checked ? Theme.accent : Theme.card;
@@ -213,6 +214,7 @@ component Option inherits Rectangle {
             border-color: root.checked ? transparent : Theme.line;
             if root.checked: Text {
                 text: "✓"; color: Theme.dark ? #10241b : #ffffff; font-size: 12px; font-weight: 700;
+                width: parent.width; height: parent.height;
                 horizontal-alignment: center; vertical-alignment: center;
                 accessible-role: none;
             }
