@@ -15,18 +15,34 @@ permissions:
   contents: read
 jobs:
   checks:
-    # PR / push 只做静态检查和单元测试。安装包构建、三平台打包与 smoke
-    # 验证统一放在 release.yml，由 tag 或手动发布触发，避免每次提交等十几分钟。
+    # PR / push 只做前端构建、静态检查和单元测试。安装包构建与三平台打包
+    # 统一放在 release.yml，由 tag 或手动发布触发，避免每次提交等十几分钟。
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
       - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libxdo-dev libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
+            libsoup-3.0-dev
+      - name: Install frontend dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Build frontend and typecheck
+        run: pnpm --dir desktop build
       - name: Test packaging layouts
         run: python3 -m unittest discover -s scripts -p "test_*.py"
       - run: cargo fmt --all -- --check

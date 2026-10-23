@@ -1,4 +1,4 @@
-"""打包 Rust 桌面产物；仅在构建机运行，不随应用分发。"""
+"""打包 Tauri 2 桌面产物；仅在构建机运行，不随应用分发。"""
 import argparse
 import os
 from pathlib import Path
@@ -14,11 +14,11 @@ ELF_MACHINES = {"amd64": 0x3E, "arm64": 0xB7}
 
 
 def cargo_version():
-    """桌面版本号的唯一来源是 desktop/Cargo.toml 的 package.version。"""
-    manifest = (ROOT / "desktop" / "Cargo.toml").read_text(encoding="utf-8")
+    """桌面版本号的唯一来源是 desktop/src-tauri/Cargo.toml 的 package.version。"""
+    manifest = (ROOT / "desktop" / "src-tauri" / "Cargo.toml").read_text(encoding="utf-8")
     match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', manifest)
     if not match:
-        raise ValueError("desktop/Cargo.toml is missing package.version")
+        raise ValueError("desktop/src-tauri/Cargo.toml is missing package.version")
     return match.group(1)
 
 
@@ -59,6 +59,7 @@ def package(platform, binary, output, version, arch):
                 "CFBundleIconFile": "SJTURM.icns",
                 "NSHighResolutionCapable": True,
                 "LSMinimumSystemVersion": "11.0",
+                "LSApplicationCategoryType": "public.app-category.education",
             }, file)
         subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(contents.parent)], check=True)
         (stage / "Applications").symlink_to("/Applications")
@@ -82,9 +83,12 @@ def package(platform, binary, output, version, arch):
             "Maintainer: Jacky Tang <tang.jie@live.com>\n"
             "Depends: libc6 (>= 2.39), libgcc-s1, libx11-6, libx11-xcb1, libxcb1, libxcb-render0, "
             "libxcb-shm0, libxkbcommon0, libxkbcommon-x11-0, libxrandr2, libxi6, libxcursor1, "
-            "libwayland-client0, libfontconfig1\nRecommends: xdg-desktop-portal, fonts-noto-cjk\n"
+            "libwayland-client0, libgtk-3-0, libwebkit2gtk-4.1-0, libjavascriptcoregtk-4.1-0, "
+            "libsoup-3.0-0\nRecommends: xdg-desktop-portal, fonts-noto-cjk\n"
             "Homepage: https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition\n"
-            "Description: SJTU RunningMan native Rust and Slint desktop client\n"
+            "Description: SJTU RunningMan Tauri desktop client\n"
+            " Rust backend with a Material Design 3 interface (React 19 + @material/web).\n"
+            " Uses the system WebKitGTK webview; no bundled Chromium.\n"
             " Built on Ubuntu 24.04 (glibc 2.39); newer distributions are backwards compatible.\n",
             encoding="utf-8",
         )

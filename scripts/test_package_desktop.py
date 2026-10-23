@@ -25,6 +25,7 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("Architecture: arm64", control)
         self.assertIn("Version: 4.5.0~rc.1", control)
         self.assertIn("libc6 (>= 2.39)", control)
+        self.assertIn("libwebkit2gtk-4.1-0", control)
         self.assertEqual((stage / "usr/bin/sjturunningman").read_bytes(), self.binary.read_bytes())
         self.assertIn("Exec=sjturunningman", (stage / "usr/share/applications/sjturunningman.desktop").read_text())
         self.assertEqual(run.call_args.args[0][0], "dpkg-deb")
