@@ -15,6 +15,7 @@
 - [@AetherWish](https://github.com/AetherWish) — 贡献了鸿蒙版源码
 - [@tangyang0](https://github.com/tangyang0) — 修复了 macOS 上的文件路径 Bug
 - [@dajiaohuang](https://github.com/dajiaohuang) — 修复变量未定义 Bug
+- [@66CF](https://github.com/66CF) — 将桌面端从 Rust + Slint 迁移到 Tauri 2 + React 19 + Material Design 3，并补齐浏览器自动化检查与 CI
 
 ## 依赖与资源
 

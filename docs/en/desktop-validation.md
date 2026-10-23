@@ -34,7 +34,7 @@ The new desktop-check.yml configures three-OS build/test/static checks and Windo
 ## Migration details
 
 - Automatic CAPTCHA recognition through the legacy service is preserved. Manual entry appears only as a fallback after recognition failure.
-- Coordinate calibration, fixed 200 m distance compensation, start-time variation, and payload fields are preserved. Sampling is reimplemented and retains corners to avoid shortening distances.
+- Coordinate calibration, fixed 200 m distance compensation, start-time variation, and payload fields are preserved. Sampling is reimplemented and retains corners to avoid shortening distances. (That compensation was removed in the 2026-10-22 Tauri migration; see the “Tauri 2 + React 19 migration” section below.)
 - Long routes are automatically truncated; the old Qt option to keep the complete route is removed. Preview shows actual generated length.
 - Import legacy TXT routes into the new user data directory. The legacy Python modules `src/` and `utils/` and `assets/resources_rc.py` have been removed together: the latter was only a side-effect import of `src/info_dialog.py`, and none of its embedded `:/resources/` entries were referenced by any code or existed as loose files, so nothing needed migrating.
 
@@ -142,14 +142,14 @@ Environment: macOS arm64, Rust 1.95.0, Node 24.18.1, pnpm 11.22.0, Tauri 2.12.5,
 - `python3 -m unittest discover -s scripts -p "test_*.py"`: 5 packaging-layout tests pass, including the WebKitGTK 4.1 / GTK 3 deb dependencies.
 - A release build (`cargo build --release -p sjturunningman --features custom-protocol`) with `--ui-smoke-test target/ui-smoke` passed every real-WKWebView check: workbench, Material components, route SVG, consent open/check/close, all four pages, loaded Roboto / Material Symbols fonts, the generated primary token, `navItems = 4`, exit code 0.
 - The Playwright mock check (`desktop/e2e/check.mjs`) passed form binding, select, switch, theme, segmented buttons, automatic-captcha login, semester statistics, task events, two-factor account display and logs. `desktop/e2e/screenshot.mjs` produced 15 screenshots at 1200×840 / 1000×700 across light, dark, four pages and dialogs.
-- Backend `--smoke-test`: default route, 4.20 km offline preview, invalid-input rejection and the 26-week placeholder calendar pass.
+- Backend `--smoke-test`: default route, 4.00 km offline preview, invalid-input rejection and the 26-week placeholder calendar pass.
 
 ### Migration notes
 
 - A bare `cargo run` is a Tauri development build and connects to `http://localhost:1420`; use `pnpm --dir desktop tauri dev`. Release and packaging builds must pass `--features custom-protocol`, otherwise the production asset protocol is not active.
 - The real window uses the system WebView; Linux needs WebKitGTK 4.1 and Windows needs the WebView2 Runtime.
 - `--smoke-test` is now a headless backend check; use `--ui-smoke-test` for the real interface. Playwright is only a mocked visual/interaction check.
-- The route preview map is now embedded in the preview card; the planner still opens in the system browser. The coordinate contract, upload payload, fixed 200 m compensation and automatic plan logic are unchanged.
+- The route preview map is now embedded in the preview card; the planner still opens in the system browser. The coordinate contract, upload payload and automatic plan logic are unchanged. Sampling now uses the selected per-run distance exactly: the fixed 200 m compensation is removed, and the map preview fallback samples the same distance as the uploaded track.
 
 ### Not yet verified
 
@@ -221,3 +221,45 @@ Android uses the system WebView to load the official login / 2FA pages, so the p
 
 - Real-device `frame-src` / custom-scheme `frame-ancestors` behaviour on Windows WebView2 and Linux WebKitGTK; the CSP syntax is shared but was not re-tested per platform.
 - The embedded page's look in the dark theme (the base map itself stays light), and the bottom-left tile-error chip under a real network failure.
+
+## Preview map and uploaded track share one sampling rule (2026-10-23)
+
+### Symptom
+
+`task.rs` already samples the uploaded track at the selected per-run distance with no fixed 200 m compensation, while the cache-miss fallback in `preview_map` still sampled `distance * 1_000.0 + 200.0`, and `resample`'s `target_m > 5_200.0` limit existed only to accommodate it. Switching, importing or deleting a route clears `preview_inputs`, so the fallback always runs and the embedded map showed 200 m more than the preview card and the uploaded track.
+
+### Fix
+
+- The fallback now samples `distance * 1_000.0`, matching `task.rs`. The step stays a fixed 10.0 m so the map page renders deterministically.
+- The fallback validates the distance first and returns "距离应在 1.20–5.00 km 之间" instead of handing invalid parameters to the sampler.
+- `resample`'s upper bound drops from 5 200 m to 5 000 m, i.e. `settings::MAX_DISTANCE_KM`; the sampler no longer reserves headroom for compensation.
+- The fallback keeps a fixed 10.0 m step: the uploaded track uses a random pace, so the preview cannot and should not reproduce the same point sequence — only the same total distance.
+
+### Verification
+
+- `cargo fmt --all -- --check`: clean.
+- New `resampling_stops_at_the_configured_distance`: 5 000 m succeeds, 5 200 m is rejected.
+
+### Not covered
+
+- This host only has the WebKitGTK runtime libraries, not `libwebkit2gtk-4.1-dev`, so `cargo clippy` and `cargo test` must be re-run in CI or on a machine with the development packages.
+- Real-device check that the preview card and the embedded map report the same length after switching routes (both should equal the selected per-run distance).
+
+## One source for the deb dependency list (2026-10-23)
+
+### Symptom
+
+`bundle.linux.deb.depends` in `desktop/src-tauri/tauri.conf.json` listed only 2 entries, while CI never runs `tauri build`: the published deb is assembled by `scripts/package_desktop.py`, which hard-coded a second, 17-entry list in `control`. The two lists contradicted each other, and editing one was invisible to the other.
+
+### Fix
+
+- `bundle.linux.deb.depends` in `tauri.conf.json` now carries the full 17-entry release list and is the single source.
+- `scripts/package_desktop.py` gained `deb_depends()`, which reads that config and writes it into `control` instead of hard-coding a second copy. `Recommends` stays in the packaging script because Tauri's deb configuration has no such field.
+
+### Verification
+
+- `python3 -m unittest discover -s scripts -p "test_*.py"`: 6 pass, including a new assertion that `control`'s `Depends` matches `tauri.conf.json` exactly; the generated list is item-for-item and order-for-order identical to the previous hard-coded one.
+
+### Not covered
+
+- `tauri build` was not run, so the union of Tauri's own auto-added dependencies with this list is untested; the release path is still the packaging script.

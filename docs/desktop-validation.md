@@ -34,7 +34,7 @@
 ## 迁移注意事项
 
 - 登录保留旧版自动识别图形验证码；识别服务异常时才显示手动备用输入。
-- 保留旧客户端坐标校准、固定 200 m 距离补偿、开始时间波动及 payload 字段；采样器重新实现，并保留拐点避免距离缩短。
+- 保留旧客户端坐标校准、固定 200 m 距离补偿、开始时间波动及 payload 字段；采样器重新实现，并保留拐点避免距离缩短。（该补偿已于 2026-10-22 的 Tauri 迁移中取消，见下文「Tauri 2 + React 19 迁移验证」。）
 - 长于目标的路线自动截取；旧 Qt 的「沿完整路线」选择不再出现。实际生成长度会显示在预览中。
 - 旧路线需通过「导入 TXT」迁移到用户数据目录。旧 Python 模块 `src/`、`utils/` 与 `assets/resources_rc.py` 已一并移除：后者只被 `src/info_dialog.py` 副作用导入，内嵌的 `:/resources/` 资源没有任何代码引用，也没有对应的松散文件，因此无需迁移。
 
@@ -142,14 +142,14 @@
 - `python3 -m unittest discover -s scripts -p "test_*.py"`：5 项打包布局测试通过，已断言 deb 依赖 WebKitGTK 4.1 / GTK 3。
 - macOS arm64 Release 二进制约 7.4 MB（LTO + strip）。Release（`cargo build --release -p sjturunningman --features custom-protocol`）运行 `--ui-smoke-test target/ui-smoke`：真实 WKWebView 中 `workbenchRendered`、`materialWeb`、`routeMap`、`consentDialog`、`consentChecked`、`consentClosed`、`routesPage`、`logsPage`、`aboutPage` 全部为 true，`fontsLoaded` 与 `primaryToken` 也为 true，`navItems = 4`，退出码 0。
 - Playwright mock 检查 `desktop/e2e/check.mjs`：表单绑定、下拉框、开关、主题、分段按钮、自动验证码登录、学期统计、任务事件、二次验证账号回填与日志全部通过。`desktop/e2e/screenshot.mjs` 生成 15 张 1200×840 / 1000×700 的浅色、深色、四页面与弹窗截图，人工检查了间距、换行、滚动与对比度。
-- 后端 `--smoke-test`：默认路线、4.20 km 离线预览、错误参数与 26 周占位日历通过。
+- 后端 `--smoke-test`：默认路线、4.00 km 离线预览、错误参数与 26 周占位日历通过。
 
 ### 迁移注意
 
 - 直接 `cargo run` 属于 Tauri 开发模式，会连接 `http://localhost:1420`；开发用 `pnpm --dir desktop tauri dev`。发布/打包必须带 `--features custom-protocol`，否则前端资源不会按生产模式加载。
 - 真实窗口显示依赖系统 WebView；Linux 需 WebKitGTK 4.1，Windows 需 WebView2 Runtime。
 - `--smoke-test` 现在是后端离线检查；真实界面检查用 `--ui-smoke-test`，Playwright 只用于 mock 视觉/交互检查。
-- 路线预览地图改为嵌入预览卡片，规划器仍通过系统浏览器打开；坐标契约、上传 payload、固定 200 m 补偿与自动排计划逻辑未变。
+- 路线预览地图改为嵌入预览卡片，规划器仍通过系统浏览器打开；坐标契约、上传 payload 与自动排计划逻辑未变。采样距离统一为所选单次距离，固定 200 m 补偿已取消，地图预览的缓存回退分支与上传生成同一口径。
 
 ### 尚未验证
 
@@ -221,3 +221,45 @@
 
 - Windows WebView2 与 Linux WebKitGTK 上 `frame-src` / 自定义协议 `frame-ancestors` 的真机表现；三平台 CSP 语法相同，但未逐平台复测。
 - 深色主题下的地图页观感（底图本身保持浅色），以及 OSM 瓦片失败时左下角错误提示的真实网络表现。
+
+## 预览地图与上传轨迹统一采样口径（2026-10-23）
+
+### 现象
+
+`task.rs` 生成上传轨迹时已按所选单次距离采样、不再加固定 200 m 补偿，但 `preview_map` 的缓存缺失回退分支仍采样 `distance * 1_000.0 + 200.0`，`resample` 的 `target_m > 5_200.0` 上限也只为迁就这条分支而存在。切换 / 导入 / 删除路线都会清空 `preview_inputs`，回退分支必然触发，内嵌地图因此比预览卡片与实际上传轨迹多出 200 m。
+
+### 修复
+
+- `preview_map` 回退分支改为 `distance * 1_000.0`，与 `task.rs` 同一口径；步长仍为固定 10.0 m，保证地图页稳定渲染。
+- 回退分支先校验距离范围，越界直接返回「距离应在 1.20–5.00 km 之间」，不再把无效参数交给采样器。
+- `resample` 上限由 5 200 m 收紧到 5 000 m，即 `settings::MAX_DISTANCE_KM`，采样器不再为补偿留出余量。
+- 回退分支的步长仍为固定 10.0 m：上传侧步长来自随机配速，预览无法也不该复现同一串点，只保证同一口径的总长度。
+
+### 验证
+
+- `cargo fmt --all -- --check`：通过。
+- 新增 `resampling_stops_at_the_configured_distance`：5 000 m 采样成功、5 200 m 被拒。
+
+### 未覆盖
+
+- 本机只有 WebKitGTK 运行库、没有 `libwebkit2gtk-4.1-dev`，`cargo clippy` 与 `cargo test` 需在 CI 或装有开发包的机器上复跑。
+- 真机上切换路线后，预览卡片与内嵌地图显示的长度是否一致（两者应同为所选单次距离）。
+
+## deb 依赖清单只保留一处来源（2026-10-23）
+
+### 现象
+
+`desktop/src-tauri/tauri.conf.json` 的 `bundle.linux.deb.depends` 只列了 2 项，而 CI 从不执行 `tauri build`：真正发布的 deb 由 `scripts/package_desktop.py` 手工打包，`control` 里硬编码了另一份 17 项清单。两份清单互相矛盾，改一处不会反映到另一处。
+
+### 修复
+
+- `tauri.conf.json` 的 `bundle.linux.deb.depends` 补齐为发布清单的完整 17 项，成为唯一来源。
+- `scripts/package_desktop.py` 新增 `deb_depends()`，从该配置读取依赖并写进 `control`，不再硬编码第二份清单；`Recommends` 保留在打包脚本里，因为 Tauri 的 deb 配置没有这一字段。
+
+### 验证
+
+- `python3 -m unittest discover -s scripts -p "test_*.py"`：6 项通过，新增断言 `control` 的 `Depends` 与 `tauri.conf.json` 完全一致；生成的依赖清单与改动前逐项相同、顺序相同。
+
+### 未覆盖
+
+- 未执行 `tauri build` 生成 deb，因此 Tauri 自身追加的依赖与这份清单的并集未实测；当前发布路径仍由打包脚本决定。
