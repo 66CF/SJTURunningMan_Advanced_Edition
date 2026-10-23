@@ -645,11 +645,11 @@ pub fn preview_map(
         Some(data) => data.points.clone(),
         None => {
             let distance = request.distance.parse::<f64>().map_err(|_| "距离无效")?;
-            route::resample(
-                &route::corrected(&route.points),
-                distance * 1_000.0 + 200.0,
-                10.0,
-            )?
+            if !(settings::MIN_DISTANCE_KM..=settings::MAX_DISTANCE_KM).contains(&distance) {
+                return Err("距离应在 1.20–5.00 km 之间".into());
+            }
+            // 预览缓存缺失时按上传同一口径重采样：不加固定距离补偿。
+            route::resample(&route::corrected(&route.points), distance * 1_000.0, 10.0)?
         }
     };
     let html = route::preview_html(&points, &route.name);

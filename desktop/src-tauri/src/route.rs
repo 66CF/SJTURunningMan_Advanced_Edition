@@ -173,7 +173,8 @@ pub fn resample(points: &[Point], target_m: f64, step_m: f64) -> Result<Vec<Poin
         || route_distance < 1.0
         || !target_m.is_finite()
         || target_m <= 0.0
-        || target_m > 5_200.0
+        // 上限即 settings::MAX_DISTANCE_KM；采样器不再为固定补偿留出余量。
+        || target_m > 5_000.0
         || !step_m.is_finite()
         || step_m < 1.0
     {
@@ -281,6 +282,13 @@ mod tests {
             3.0
         )
         .is_err());
+    }
+    #[test]
+    fn resampling_stops_at_the_configured_distance() {
+        let points = parse("121,31\n121.002,31").unwrap();
+        let sampled = resample(&points, 5_000.0, 3.0).unwrap();
+        assert!((distance(&sampled) - 5_000.0).abs() < 0.1);
+        assert!(resample(&points, 5_200.0, 3.0).is_err());
     }
     #[test]
     fn preview_escapes_titles_and_maps_only_osm() {
