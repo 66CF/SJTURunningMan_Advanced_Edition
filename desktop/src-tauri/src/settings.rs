@@ -5,6 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// 桌面端用户可设距离范围；不再另外增加固定距离补偿。
+pub const MIN_DISTANCE_KM: f64 = 1.2;
+pub const MAX_DISTANCE_KM: f64 = 5.0;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -45,8 +49,21 @@ pub fn load(dir: &Path) -> Result<Settings, String> {
         return Ok(Settings::default());
     }
     let bytes = fs::read(&path).map_err(|_| "无法读取偏好设置")?;
-    match serde_json::from_slice(&bytes) {
-        Ok(settings) => Ok(settings),
+    match serde_json::from_slice::<Settings>(&bytes) {
+        Ok(mut settings) => {
+            // 兼容旧版本的距离范围；无效数字回到默认值。
+            let distance = settings
+                .distance
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .filter(|v| v.is_finite());
+            settings.distance = match distance {
+                Some(value) => value.clamp(MIN_DISTANCE_KM, MAX_DISTANCE_KM).to_string(),
+                None => Settings::default().distance,
+            };
+            Ok(settings)
+        }
         Err(_) => {
             // 备份坏文件，之后照常保存，否则用户后续的改动永远不会落盘。
             let backup = dir.join("settings.json.bak");
@@ -88,8 +105,8 @@ impl RunConfig {
             .trim()
             .parse()
             .map_err(|_| "距离应为数字，单位 km")?;
-        if !distance_km.is_finite() || distance_km <= 0.0 || distance_km > 5.0 {
-            return Err("距离应大于 0 且不超过 5 km".into());
+        if !(MIN_DISTANCE_KM..=MAX_DISTANCE_KM).contains(&distance_km) {
+            return Err("距离应在 1.20–5.00 km 之间".into());
         }
         let date_text = date.trim();
         if date_text.len() != 10 {
@@ -130,7 +147,7 @@ mod tests {
         for runs in ["0", "31", "-1", "1.5", ""] {
             assert!(RunConfig::parse(runs, "4", "2026-10-15", "08:00:00").is_err());
         }
-        for distance in ["NaN", "inf", "0", "-1", "5.1", "abc"] {
+        for distance in ["NaN", "inf", "0", "-1", "1", "1.19", "5.01", "5.1", "abc"] {
             assert!(RunConfig::parse("1", distance, "2026-10-15", "08:00:00").is_err());
         }
         for date in ["2026-2-01", "2026/10/15", "2026-02-30", ""] {
@@ -138,6 +155,9 @@ mod tests {
         }
         for time in ["8:00", "8:00:00", "24:00:00", "08:60:00"] {
             assert!(RunConfig::parse("1", "4", "2026-10-15", time).is_err());
+        }
+        for distance in ["1.2", "1.21", "4", "5"] {
+            assert!(RunConfig::parse("1", distance, "2026-10-15", "08:00:00").is_ok());
         }
         assert!(RunConfig::parse("30", "5", "2026-10-15", "23:59:59").is_ok());
     }
@@ -161,6 +181,34 @@ mod tests {
         assert_eq!(saved.runs, "3");
         assert!(saved.skip_existing);
         assert!(!saved.plan_auto);
+    }
+
+    #[test]
+    fn legacy_distances_are_restored_within_current_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        for (stored, expected) in [
+            ("0.1", "1.2"),
+            ("1", "1.2"),
+            ("1.19", "1.2"),
+            ("1.2", "1.2"),
+            ("2.5", "2.5"),
+            ("5", "5"),
+            ("6", "5"),
+            ("NaN", "4"),
+            ("inf", "4"),
+            ("broken", "4"),
+        ] {
+            let settings = Settings {
+                distance: stored.into(),
+                ..Settings::default()
+            };
+            save(dir.path(), &settings).unwrap();
+            assert_eq!(
+                load(dir.path()).unwrap().distance,
+                expected,
+                "stored distance: {stored}"
+            );
+        }
     }
 
     #[test]

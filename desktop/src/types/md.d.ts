@@ -109,6 +109,7 @@ type ButtonProps = ElementProps & {
 };
 
 type IconButtonProps = ElementProps & {
+  type?: 'submit' | 'reset' | 'button';
   disabled?: boolean;
   href?: string;
   target?: string;

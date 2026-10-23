@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Datepicker } from 'material/react';
 import type { DatepickerElement } from 'material/elements';
+import type { CalendarWeek, DayState } from '../lib/backend';
 
 interface DateFieldProps {
   value: string;
   onValueChange: (value: string) => void;
   disabled: boolean;
+  weeks: CalendarWeek[];
 }
 
 const months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -16,7 +18,7 @@ const labels: Record<string, string> = {
   'Enter a selectable date (YYYY-MM-DD).': '请输入可选择的日期（YYYY-MM-DD）。',
   'Date is not selectable.': '该日期不可选择。',
   'Select a date.': '请选择日期。',
-  'OK': '确定', 'Cancel': '取消', 'Date': '日期', 'Select date': '选择日期',
+  'Save': '确定', 'OK': '确定', 'Cancel': '取消', 'Date': '日期', 'Select date': '选择日期',
   'Select month': '选择月份', 'Select year': '选择年份',
   'Choose month': '选择月份', 'Choose year': '选择年份',
   'Previous month': '上个月', 'Next month': '下个月',
@@ -33,7 +35,7 @@ weekdays.forEach((day, index) => { labels[day] = `星期${'日一二三四五六
 
 /** material 3.2.4 has no locale option. Translate presentation only;
  * all date validation, selection, navigation and focus remain upstream. */
-function localize(root: ShadowRoot) {
+function localize(root: ShadowRoot, records: Map<string, DayState>) {
   const translate = (text: string) => {
     if (labels[text]) return labels[text];
     const headline = text.match(/^([A-Za-z]+) (\d{1,2}), (\d{4})$/);
@@ -52,8 +54,15 @@ function localize(root: ShadowRoot) {
   root.querySelectorAll<HTMLElement>('[aria-label]').forEach((element) => {
     const label = element.getAttribute('aria-label') ?? '';
     const date = element.dataset.date;
+    const state = date ? records.get(date) : undefined;
+    const status = state === 'valid' ? '已打卡，计入成绩' : state === 'invalid' ? '已打卡，无效记录' : '';
+    if (date) {
+      element.part.toggle('record-valid', state === 'valid');
+      element.part.toggle('record-invalid', state === 'invalid');
+      if (element.title !== status) element.title = status;
+    }
     const translated = date
-      ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date(`${date}T12:00:00`))
+      ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date(`${date}T12:00:00`)) + (status ? `，${status}` : '')
       : translate(label);
     if (label !== translated) element.setAttribute('aria-label', translated);
   });
@@ -63,36 +72,59 @@ function localize(root: ShadowRoot) {
   });
 }
 
-export function DateField({ value, onValueChange, disabled }: DateFieldProps) {
+export function DateField({ value, onValueChange, disabled, weeks }: DateFieldProps) {
   const ref = useRef<DatepickerElement>(null);
   useEffect(() => {
     const root = ref.current?.shadowRoot;
     if (!root) return;
-    const observer = new MutationObserver(() => localize(root));
+    // Month headings are carried only by the first week of each month.
+    const records = new Map<string, DayState>();
+    let month = '';
+    for (const week of weeks) {
+      if (week.title) {
+        const match = /^(\d{4})年(\d{1,2})月$/.exec(week.title);
+        month = match ? `${match[1]}-${match[2].padStart(2, '0')}` : '';
+      }
+      if (!month) continue;
+      for (const day of week.days) {
+        if (day.day > 0 && day.state !== 'none') {
+          records.set(`${month}-${String(day.day).padStart(2, '0')}`, day.state);
+        }
+      }
+    }
+    const update = () => localize(root, records);
+    const observer = new MutationObserver(update);
     observer.observe(root, { childList: true, characterData: true, subtree: true });
-    localize(root);
+    update();
     return () => observer.disconnect();
-  }, []);
+  }, [weeks]);
 
   useEffect(() => {
     const host = ref.current;
     if (!host) return;
-    const calendar = () => host.shadowRoot?.querySelector('dialog');
-    const position = () => {
-      const panel = calendar();
-      if (!panel?.open) return;
-      const bounds = host.getBoundingClientRect();
-      // Keep the docked panel inside the scrolling workbench, above the task bar.
-      const bottom = host.closest('.page')?.getBoundingClientRect().bottom ?? window.innerHeight;
-      host.style.setProperty('--app-date-height', `${Math.max(0, bottom - bounds.bottom - 24)}px`);
+    let animation: Animation | undefined;
+    const stop = () => animation?.cancel();
+    const open = () => {
+      stop();
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const panel = host.shadowRoot?.querySelector('dialog');
+      if (!panel) return;
+      const tokens = getComputedStyle(host);
+      // Match the upstream time picker without relying on cross-shadow keyframes.
+      animation = panel.animate([
+        { opacity: 0, transform: tokens.getPropertyValue('--app-picker-enter-transform').trim() },
+        { opacity: 1, transform: 'none' },
+      ], {
+        duration: parseFloat(tokens.getPropertyValue('--app-motion-duration-medium')),
+        easing: tokens.getPropertyValue('--app-picker-enter-easing').trim(),
+      });
     };
-    host.addEventListener('open', position);
-    window.addEventListener('resize', position);
-    document.addEventListener('scroll', position, true);
+    host.addEventListener('open', open);
+    host.addEventListener('close', stop);
     return () => {
-      host.removeEventListener('open', position);
-      window.removeEventListener('resize', position);
-      document.removeEventListener('scroll', position, true);
+      stop();
+      host.removeEventListener('open', open);
+      host.removeEventListener('close', stop);
     };
   }, []);
 
@@ -101,8 +133,7 @@ export function DateField({ value, onValueChange, disabled }: DateFieldProps) {
       ref={ref}
       className="md3-date-field"
       label="结束日期"
-      variant="docked"
-      closeOnSelect
+      variant="modal"
       dateFormat="YYYY-MM-DD"
       supportingText="YYYY-MM-DD"
       value={value}

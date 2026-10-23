@@ -6,7 +6,7 @@ const browser = await (process.env.BROWSER === 'webkit' ? webkit : chromium).lau
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 840 } });
   await page.addInitScript({ path: 'e2e/mock-init.js' });
-  await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+  await page.goto(process.env.E2E_BASE_URL || 'http://localhost:4173/', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const alignment = await page.locator('.checkbox-row').evaluate(el => {
     const box = el.querySelector('md-checkbox').getBoundingClientRect();

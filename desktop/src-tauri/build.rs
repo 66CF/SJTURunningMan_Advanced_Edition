@@ -22,16 +22,7 @@ fn main() {
     if std::env::var_os("CARGO_FEATURE_CUSTOM_PROTOCOL").is_some()
         && !std::path::Path::new("../dist/index.html").exists()
     {
-        panic!("缺少 desktop/dist/index.html：请先运行 vite v8.3.5 building client environment for production...
-transforming...
-✓ 201 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   0.45 kB │ gzip:   0.29 kB
-dist/assets/index-CmF-FlXM.css   38.83 kB │ gzip:   6.41 kB
-dist/assets/index-D8QRIYfX.js   571.18 kB │ gzip: 142.43 kB
-
-✓ built in 94ms，再构建生产版");
+        panic!("缺少 desktop/dist/index.html：请先运行 pnpm --dir desktop build，再构建生产版");
     }
     tauri_build::build();
 }

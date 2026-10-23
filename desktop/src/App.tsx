@@ -29,6 +29,7 @@ import {
   type Page,
 } from './components/AppShell';
 import { Notice } from './components/Notice';
+import { TaskCelebration } from './components/TaskCelebration';
 import { WorkbenchPage } from './pages/WorkbenchPage';
 import { RoutesPage } from './pages/RoutesPage';
 import { LogsPage, type LogEntry } from './pages/LogsPage';
@@ -101,8 +102,10 @@ export function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [networkBusy, setNetworkBusy] = useState(false);
-  const [previewBusy, setPreviewBusy] = useState(false);
   const [updateStatus, setUpdateStatus] = useState('按需检查更新，启动时不请求网络。');
+  const [celebration, setCelebration] = useState(0);
+  const celebrationId = useRef(0);
+  const clearCelebration = useCallback(() => setCelebration(0), []);
   const [task, setTask] = useState({ busy: false, progress: 0, status: '准备就绪' });
   const [consentOpen, setConsentOpen] = useState(true);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
@@ -167,8 +170,15 @@ export function App() {
 
   useEffect(() => {
     if (!boot) return;
-    getCurrentWindow().setTheme(dark ? 'dark' : 'light').catch(() => undefined);
-  }, [dark, boot]);
+    const nativeWindow = getCurrentWindow();
+    const surface = getComputedStyle(document.documentElement)
+      .getPropertyValue('--md-sys-color-surface').trim();
+    // macOS also paints the title bar with the explicitly configured window background.
+    Promise.all([
+      nativeWindow.setTheme(dark ? 'dark' : 'light'),
+      nativeWindow.setBackgroundColor(surface),
+    ]).catch((error) => appendLog(`窗口主题同步失败：${errorMessage(error)}`));
+  }, [dark, boot, appendLog]);
 
   useEffect(() => {
     if (!boot) return;
@@ -485,28 +495,6 @@ export function App() {
     if (autoPreviewTimer.current !== null) window.clearTimeout(autoPreviewTimer.current);
   }, []);
 
-  const requestPreview = useCallback(async () => {
-    if (!route) return;
-    if (autoPreviewTimer.current !== null) {
-      window.clearTimeout(autoPreviewTimer.current);
-      autoPreviewTimer.current = null;
-    }
-    const request: PreviewRequest = { runs, distance, date, time, route: routeName };
-    const seq = ++previewSeq.current;
-    setPreviewBusy(true);
-    try {
-      const data = await backend.previewRoute(request);
-      if (seq !== previewSeq.current) return;
-      setPreview(data);
-      setPreviewInputs(request);
-      notify('离线预览已更新，未发送网络请求', 'success');
-    } catch (error) {
-      if (seq === previewSeq.current) notify(errorMessage(error), 'error');
-    } finally {
-      setPreviewBusy(false);
-    }
-  }, [route, runs, distance, date, time, routeName, notify]);
-
   const openMap = useCallback(async (): Promise<PreviewMapResult | null> => {
     const request: PreviewRequest = { runs, distance, date, time, route: routeName };
     setNetworkBusy(true);
@@ -670,6 +658,9 @@ export function App() {
     (payload) => {
       setTask({ busy: false, progress: payload.progress, status: payload.status });
       showNotice(payload.status, payload.stopped ? 'info' : 'success');
+      if (payload.success > 0 && payload.failed === 0 && !payload.stopped) {
+        setCelebration(++celebrationId.current);
+      }
     },
   );
   useTauriEvent<{ message: string; status: string }>('task-error', (payload) => {
@@ -695,12 +686,15 @@ export function App() {
         previewInputs.time !== time ||
         previewInputs.route !== routeName),
   );
-  const busy = task.busy || networkBusy || previewBusy || login.loading;
+  const busy = task.busy || networkBusy || login.loading;
   const modalOpen = consentOpen || login.open || confirm !== null;
   const meta = PAGE_META[page];
 
   return (
     <div className="app-shell">
+      {celebration > 0 ? (
+        <TaskCelebration key={celebration} onComplete={clearCelebration} />
+      ) : null}
       <Sidebar
         page={page}
         onNavigate={setPage}
@@ -713,7 +707,6 @@ export function App() {
           page={page}
           dark={dark}
           loggedIn={loggedIn}
-          user={user}
           busy={busy}
           onToggleTheme={() => setDark((value) => !value)}
           onAccount={handleAccount}
@@ -727,6 +720,7 @@ export function App() {
           <div className={`page page-${page}`}>
             {page === 'workbench' ? (
               <WorkbenchPage
+                weeks={weeks}
                 runs={runs}
                 onRunsChange={setRuns}
                 distance={distance}
@@ -747,12 +741,12 @@ export function App() {
                   previewInputs.time !== time || previewInputs.route !== routeName
                 ))}
                 busy={task.busy || networkBusy}
-                onPreview={requestPreview}
                 onOpenMap={openMap}
               />
             ) : null}
             {page === 'routes' ? (
               <RoutesPage
+                distanceKm={Number(distance)}
                 routes={routes}
                 route={route}
                 routeName={routeName}
@@ -760,7 +754,6 @@ export function App() {
                 stale={stale}
                 busy={task.busy || networkBusy}
                 onSelect={chooseRoute}
-                onPreview={requestPreview}
                 onOpenMap={openMap}
                 onPlanner={openPlanner}
                 onImport={importRoute}
@@ -820,6 +813,7 @@ export function App() {
         notice={login.notice}
         noticeKind={login.noticeKind}
         onRefresh={() => void refreshCaptcha()}
+        onEdit={() => setLogin((previous) => ({ ...previous, notice: '' }))}
         onSubmit={handleSubmitLogin}
         onCancel={cancelLogin}
       />

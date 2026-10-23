@@ -187,9 +187,9 @@ pub fn percent_from_ratio(numerator: Option<f64>, denominator: Option<f64>) -> O
     }
 }
 
-/// 自动排计划的边界：单次距离取服务器允许的 1–5 km，次数取客户端上限 30。
-pub const PLAN_MIN_KM: f64 = 1.0;
-pub const PLAN_MAX_KM: f64 = 5.0;
+/// 自动排计划与桌面端手动配置共用距离边界，次数取客户端上限 30。
+pub const PLAN_MIN_KM: f64 = crate::settings::MIN_DISTANCE_KM;
+pub const PLAN_MAX_KM: f64 = crate::settings::MAX_DISTANCE_KM;
 pub const PLAN_MAX_RUNS: u32 = 30;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -448,12 +448,12 @@ mod tests {
                 distance_km: 5.0
             })
         );
-        // 缺口太小也要留一条有效记录，单次距离不低于 1 km。
+        // 缺口太小也要留一条有效记录，单次距离不低于 1.2 km。
         assert_eq!(
             auto_plan(0.5),
             Some(AutoPlan {
                 runs: 1,
-                distance_km: 1.0
+                distance_km: 1.2
             })
         );
         // 缺口大到 30 次 × 5 km 也补不完时，按上限给出最接近的计划。

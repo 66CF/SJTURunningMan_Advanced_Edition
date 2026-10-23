@@ -8,7 +8,7 @@
 | Desktop | ✅ Yes | Rust unit tests, local HTTP mocks, backend/real-WebView smoke tests, Playwright interaction and screenshot checks |
 | iOS | ❌ None | No test target |
 | HarmonyOS | ❌ None | Manual acceptance only (see below) |
-| CI | ✅ Desktop tests | `desktop-check.yml` runs frontend build, fmt / clippy / unit tests on Ubuntu; installers run only in the release workflow |
+| CI | ✅ Desktop tests | `desktop-check.yml` runs frontend build, fmt / clippy / unit tests and Chromium mock IPC interaction checks on Ubuntu; installers run only in the release workflow |
 
 **Additional tests are welcome** — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
@@ -91,7 +91,7 @@ The release binary's `--smoke-test target/smoke` starts no window. It verifies d
 ./target/release/sjturunningman --ui-smoke-test target/ui-smoke
 ```
 
-This opens a real Tauri window, waits for React to render, then checks the workbench, `md-*` component registration, the track SVG, the consent dialog (open / check / close), the map embedded in the preview card (iframe, frame-ready message, no "已在地图中显示当前轨迹" top notice, and SVG restored after "Collapse map") and all four navigation pages. The result is written to `target/ui-smoke/ui-smoke-result.json`; the exit code is 0 when `success` is `true`. It uses an isolated data directory and never logs in or uploads.
+This opens a real Tauri window, waits for React to render, then checks the workbench, `md-*` component registration, the track SVG, the consent dialog (open / check / close), the map embedded in the preview card (iframe, frame-ready message, no "已在地图中显示当前轨迹" top notice, no "Collapse map" on the workbench, and SVG restored after collapsing in Route management) and all four navigation pages. The result is written to `target/ui-smoke/ui-smoke-result.json`; the exit code is 0 when `success` is `true`. It uses an isolated data directory and never logs in or uploads.
 
 ### Playwright visual and interaction checks (optional)
 
@@ -107,18 +107,20 @@ node desktop/e2e/screenshot.mjs                                 # screenshots in
 ### Manual checklist
 
 - [ ] The consent dialog gates entry; Exit closes the app.
-- [ ] Runs 0 / 31, distance NaN / 0 / 6, malformed date are rejected; the start time can only be chosen through the picker and is always valid.
+- [ ] Incomplete login disables submission; typing and IME confirmation neither send a request nor clear the password. Visibility / CAPTCHA refresh never log in. Clicking Login or pressing Enter on a complete form submits once; editing after failure clears the old error.
+- [ ] Runs 0 / 31, distance NaN / 0 / 1.19 / 5.01 / 6, malformed date are rejected; the start time can only be chosen through the picker and is always valid.
 - [ ] Chinese text, light/dark themes, Tab / Enter / Space, display scaling and small-window scrolling work; the native title bar follows the theme.
 - [ ] Navigation, cards, buttons, text fields, selects, switches and dialogs use Material Design 3 roles and shapes; no other UI component library is mixed in.
-- [ ] Offline preview includes the legacy 200 m compensation; open routes reverse, closed routes loop; gaps over 150 m are highlighted in red with a warning.
+- [ ] Offline tracks match the selected distance at 1.20 / 1.21 / 4 / 5 km without an extra 200 m; open routes reverse, closed routes loop; gaps over 150 m are highlighted in red with a warning.
 - [ ] Dragging the distance slider updates the track automatically and clears the stale mark without a top notice; changing runs/date/start time marks it stale, and switching routes shows the raw route again; regenerating updates map, summary and distance together.
+- [ ] The slider spans 1.20–5.00 km; Home / End and arrow keys stay within bounds, both distance displays agree, old values below 1.20 km restore to the minimum, and automatic plans respect that minimum.
 - [ ] The plan summary updates live with runs, distance, date and start time; a short window can scroll to the route selector.
 - [ ] The runs field matches the date/time field height and its helper lines up with the distance helper; the three preview metrics share text baselines; the route menu aligns with the select and is not hidden by the task bar.
 - [ ] Clicking start time opens a compact 12-hour time-picker dialog (about 328 px wide, not fullscreen); choosing hour/minute and AM/PM (no seconds) and confirming fills the field, cancel or Esc leaves it unchanged, and the field and summary show `hh:mm AM/PM`.
 - [ ] Notices appear as a top-right snackbar, do not push content down, and auto-dismiss after about six seconds; success/error use the matching MD3 container colors.
 - [ ] In the single-column layout, the end-date calendar and route dropdown paint above the preview card instead of being covered.
 - [ ] Default route, import from the Routes page, duplicate names, persistence and copy-only deletion work; the source remains untouched.
-- [ ] "Open in map" embeds the map in the preview card with matching endpoints and track; "Collapse map" returns to the SVG; the planner still opens in the browser and its TXT can be imported.
+- [ ] "Open in map" embeds the map in the preview card with matching endpoints and track; the workbench has no "Collapse map" button, while Route management can collapse to the SVG; the planner still opens in the browser and its TXT can be imported.
 - [ ] With a valid account, automatic CAPTCHA recognition, refresh/manual fallback, and app/email/SMS verification work; the password is cleared from the field immediately after submission.
 - [ ] Two-factor verification: app / email / SMS delivery works; a six-digit code submitted within its validity window succeeds; resending invalidates the previous code; errors distinguish expiry, lost session and other codes.
 - [ ] After login the semester progress and calendar refresh automatically; while logged out or after a failed refresh they keep placeholders and logout restores them.

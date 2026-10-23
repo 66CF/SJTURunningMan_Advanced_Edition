@@ -1,4 +1,5 @@
 import { Slider } from 'material/react';
+import { MIN_DISTANCE_KM, MAX_DISTANCE_KM } from '../lib/distance';
 
 interface DistanceSliderProps {
   value: string;
@@ -13,7 +14,7 @@ export function DistanceSlider({ value, onValueChange, disabled }: DistanceSlide
       event.preventDefault();
       event.stopPropagation();
       const direction = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : -1;
-      onValueChange(String(Number(Math.max(0.1, Math.min(5, Number(value) + direction * (event.shiftKey ? 0.1 : 0.01))).toFixed(2))));
+      onValueChange(String(Number(Math.max(MIN_DISTANCE_KM, Math.min(MAX_DISTANCE_KM, Number(value) + direction * (event.shiftKey ? 0.1 : 0.01))).toFixed(2))));
     }}>
       <div className="distance-heading">
         <span>单次距离</span>
@@ -22,8 +23,8 @@ export function DistanceSlider({ value, onValueChange, disabled }: DistanceSlide
       <Slider
         aria-label="单次距离"
         aria-valuetext={`${Number(value).toFixed(2)} 公里`}
-        min={0.1}
-        max={5}
+        min={MIN_DISTANCE_KM}
+        max={MAX_DISTANCE_KM}
         step={0}
         size="XS"
         showValue={false}
@@ -31,7 +32,7 @@ export function DistanceSlider({ value, onValueChange, disabled }: DistanceSlide
         onInput={(event) => onValueChange(String(event.detail.value))}
         disabled={disabled}
       />
-      <span className="distance-support">0.1–5 km · 连续调节</span>
+      <span className="distance-support">1.20–5.00 km · 连续调节</span>
     </div>
   );
 }

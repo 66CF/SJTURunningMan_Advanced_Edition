@@ -13,7 +13,6 @@ interface RoutePreviewCardProps {
   stale: boolean;
   busy: boolean;
   mode: 'workbench' | 'routes';
-  onPreview: () => void;
   onOpenMap: () => Promise<PreviewMapResult | null>;
   onPlanner?: () => void;
   onDelete?: () => void;
@@ -26,7 +25,6 @@ export function RoutePreviewCard({
   stale,
   busy,
   mode,
-  onPreview,
   onOpenMap,
   onPlanner,
   onDelete,
@@ -38,7 +36,7 @@ export function RoutePreviewCard({
     if (!mapUrl) return;
     frameRef.current?.contentWindow?.postMessage({ type: 'sjturm-route-update', points, bounds: distanceKm !== undefined ? live.bounds : undefined }, new URL(mapUrl).origin);
   };
-  const distance = distanceKm !== undefined ? distanceKm + 0.2 : preview ? preview.distanceM / 1000 : route?.distanceKm ?? 0;
+  const distance = distanceKm !== undefined ? distanceKm : preview ? preview.distanceM / 1000 : route?.distanceKm ?? 0;
   const pointCount = points.length;
   const jumpSegments = distanceKm !== undefined
     ? points.flatMap((p, i) => i > 0 && meters(points[i - 1], p) > 150 ? [i] : [])
@@ -94,7 +92,9 @@ export function RoutePreviewCard({
               <div className="card-eyebrow">路线预览</div>
               <h2 className="card-title">{route ? routeDisplayName(route.name) : '未选择路线'}</h2>
               <p className="card-sub">
-                {preview
+                {distanceKm !== undefined && route
+                  ? `按当前单次距离 ${distanceKm.toFixed(2)} km 自动预览 · 原始路线 ${route.distanceKm.toFixed(2)} km`
+                  : preview
                   ? preview.summary
                   : route
                     ? `原始路线 ${route.distanceKm.toFixed(2)} km · ${route.pointCount} 个坐标点`
@@ -136,7 +136,7 @@ export function RoutePreviewCard({
             points={points}
             bounds={distanceKm !== undefined ? live.bounds : undefined}
             height={mode === 'routes' ? 380 : 340}
-            stale={mode === 'routes' && stale}
+            stale={distanceKm === undefined && stale}
             jumpSegments={jumpSegments}
             label={`${route ? routeDisplayName(route.name) : ''} 轨迹预览`}
           />
@@ -171,11 +171,7 @@ export function RoutePreviewCard({
             <span>{route.warning}</span>
           </div>
         ) : null}
-        <div className="card-actions">
-          {mode === 'routes' ? <md-filled-tonal-button onClick={onPreview} disabled={busy || !route}>
-            <md-icon slot="icon" aria-hidden="true">route</md-icon>
-            {preview ? '重新生成预览' : '预览实际轨迹'}
-          </md-filled-tonal-button> : null}
+        {mode === 'routes' || !mapUrl ? <div className="card-actions">
           <md-outlined-button onClick={toggleMap} disabled={busy || !route || mapLoading}>
             <md-icon slot="icon" aria-hidden="true">map</md-icon>
             {mapLoading ? '正在加载地图…' : mapUrl ? '收起地图' : '在地图中打开'}
@@ -186,7 +182,7 @@ export function RoutePreviewCard({
               设计路线
             </md-text-button>
           ) : null}
-        </div>
+        </div> : null}
       </div>
     </md-outlined-card>
   );

@@ -225,7 +225,11 @@ pub const BAIDU_MAP_AK: &str = "MYUXpppuOOvq99cP2AmDvplAW76VV8vr";
 const PREVIEW_TEMPLATE: &str = include_str!("route_preview.html");
 
 pub fn preview_html(points: &[Point], title: &str) -> String {
-    let title = if title == "default" { "思源湖" } else { title };
+    let title = if title == "default" {
+        "思源湖"
+    } else {
+        title
+    };
     // BD09 原始路线与 GCJ02 payload 在调用端统一为 GCJ02；OpenStreetMap 页面
     // 显示前再转 WGS84。
     let points = serde_json::to_string(points).unwrap_or_else(|_| "[]".into());

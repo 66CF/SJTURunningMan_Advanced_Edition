@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Point } from './backend';
+import { MAX_DISTANCE_KM } from './distance';
 
 export function meters(a: Point, b: Point) {
   const rad = Math.PI / 180;
@@ -22,7 +23,7 @@ export function routeGeometry(raw: Point[]) {
 export function trimRoute(geometry: ReturnType<typeof routeGeometry>, distance: number): Point[] {
   if (geometry.total < 1 || !Number.isFinite(distance)) return [];
   const result = [geometry.points[0]];
-  let remaining = Math.max(0, Math.min(distance, 5200));
+  let remaining = Math.max(0, Math.min(distance, MAX_DISTANCE_KM * 1000));
   let index = 0;
   while (remaining > 1e-8 && result.length < 30000) {
     const length = geometry.lengths[index];
@@ -40,7 +41,7 @@ export function trimRoute(geometry: ReturnType<typeof routeGeometry>, distance: 
 
 export function useLiveRoute(raw: Point[], distanceKm: number | undefined) {
   const geometry = useMemo(() => routeGeometry(raw), [raw]);
-  const target = (distanceKm ?? 0) * 1000 + 200;
+  const target = (distanceKm ?? 0) * 1000;
   const current = useRef(target);
   const previousGeometry = useRef(geometry);
   const [distance, setDistance] = useState(target);

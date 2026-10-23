@@ -186,6 +186,7 @@ function handle(command, args) {
       return null;
     case 'plugin:window|show':
     case 'plugin:window|set_theme':
+    case 'plugin:window|set_background_color':
       return null;
     case 'plugin:dialog|open':
       return null;

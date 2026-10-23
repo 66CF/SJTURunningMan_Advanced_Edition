@@ -72,7 +72,7 @@ cd apps/harmonyos && hvigorw assembleHap
 
 ## 测试现状
 
-Rust 电脑版有单元测试、本地 HTTP mock、后端 `--smoke-test` 与真实 WebView `--ui-smoke-test` 验收；`desktop/e2e/` 另有基于 mock IPC 的 Playwright 交互与截图检查（手动运行）。`desktop-check.yml` 在 PR / push 上跑前端构建、fmt、clippy 和单元测试；安装包构建只在 `release.yml`（tag 或手动发布）执行。安卓保留既有单元及仪器测试。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
+Rust 电脑版有单元测试、本地 HTTP mock、后端 `--smoke-test` 与真实 WebView `--ui-smoke-test` 验收；`desktop/e2e/` 另有基于 mock IPC 的 Playwright 交互与截图检查（手动运行）。`desktop-check.yml` 在 PR / push 上跑前端构建、fmt、clippy、单元测试和 Chromium mock IPC 交互检查；安装包构建只在 `release.yml`（tag 或手动发布）执行。安卓保留既有单元及仪器测试。iOS / 鸿蒙仍按 [docs/testing.md](docs/testing.md) 手动验收。真实认证与上传另需有效账号验收。
 
 ## 修改约定
 

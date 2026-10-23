@@ -42,6 +42,16 @@ interface SidebarProps {
   loggedIn: boolean;
 }
 
+/** Keep the domain for recognition, but never expose the complete account name. */
+function maskAccount(user: string): string {
+  const account = user.trim();
+  if (!account) return '***';
+  const at = account.lastIndexOf('@');
+  const name = Array.from(at >= 0 ? account.slice(0, at) : account);
+  const prefix = name.slice(0, Math.min(2, Math.max(0, name.length - 1))).join('');
+  return `${prefix}***${at >= 0 ? account.slice(at) : ''}`;
+}
+
 export function Sidebar({ page, onNavigate, version, user, loggedIn }: SidebarProps) {
   const ref = useRef<MdNavigationDrawer>(null);
   useEffect(() => {
@@ -56,7 +66,7 @@ export function Sidebar({ page, onNavigate, version, user, loggedIn }: SidebarPr
           <img src="/app-icon.png" alt="" className="brand-icon" />
           <div className="brand-copy">
             <span className="brand-name">RunningMan</span>
-            <span className="brand-sub">SJTU · 校园跑</span>
+            <span className="brand-sub">SJTU · 交我润</span>
           </div>
         </div>
         <md-list className="nav-list" type="button">
@@ -78,7 +88,7 @@ export function Sidebar({ page, onNavigate, version, user, loggedIn }: SidebarPr
         <div className="drawer-spacer" />
         <div className="drawer-status">
           <span className={`status-dot${loggedIn ? ' is-online' : ''}`} />
-          <span>{loggedIn ? `已连接 · ${user}` : '未登录 · 可离线预览'}</span>
+          <span>{loggedIn ? `已连接 · ${maskAccount(user)}` : '未登录 · 可离线预览'}</span>
         </div>
         <div className="drawer-foot">
           <span>Material Design 3</span>
@@ -93,13 +103,12 @@ interface TopBarProps {
   page: Page;
   dark: boolean;
   loggedIn: boolean;
-  user: string;
   busy: boolean;
   onToggleTheme: () => void;
   onAccount: () => void;
 }
 
-export function TopBar({ page, dark, loggedIn, user, busy, onToggleTheme, onAccount }: TopBarProps) {
+export function TopBar({ page, dark, loggedIn, busy, onToggleTheme, onAccount }: TopBarProps) {
   const meta = PAGE_META[page];
   return (
     <header className="top-bar">
@@ -108,10 +117,6 @@ export function TopBar({ page, dark, loggedIn, user, busy, onToggleTheme, onAcco
         <p>{meta.subtitle}</p>
       </div>
       <div className="top-bar-actions">
-        <span className={`session-pill${loggedIn ? ' is-online' : ''}`} title={loggedIn ? '会话仅保存在内存中' : '未登录'}>
-          <i />
-          {loggedIn ? user : '未登录'}
-        </span>
         <md-icon-button
           aria-label={dark ? '切换到浅色外观' : '切换到深色外观'}
           title={dark ? '切换到浅色外观' : '切换到深色外观'}
@@ -147,7 +152,6 @@ interface TaskBarProps {
 export function TaskBar({ page, busy, progress, status, loggedIn, semesterKm, semesterPercent, runDays, compact, onStart, onStop }: TaskBarProps) {
   const percent = Number.parseFloat(semesterPercent);
   const hasSemester = loggedIn && Number.isFinite(percent);
-  const showStatus = busy || status !== '准备就绪';
   if (compact) {
     return (
       <div className="task-bar task-bar-compact">
@@ -163,9 +167,9 @@ export function TaskBar({ page, busy, progress, status, loggedIn, semesterKm, se
   return (
     <div className={`task-bar${busy ? ' is-busy' : ''}`}>
       <div className="task-bar-status">
-        {showStatus ? (
+        {busy ? (
           <div className="task-bar-line">
-            <span className={busy ? 'live-dot' : 'idle-dot'} />
+            <span className="live-dot" />
             <span className="task-status-text">{status}</span>
             {busy ? (
               <span className="task-progress-text">{Math.round(progress)}%</span>

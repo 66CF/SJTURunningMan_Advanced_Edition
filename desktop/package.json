@@ -16,6 +16,7 @@
     "@material/web": "2.5.0",
     "@tauri-apps/api": "2.12.4",
     "@tauri-apps/plugin-dialog": "2.8.3",
+    "canvas-confetti": "1.9.4",
     "material": "3.2.4",
     "react": "19.3.1",
     "react-dom": "19.3.1"
@@ -24,6 +25,7 @@
     "@material/material-color-utilities": "0.3.0",
     "@playwright/test": "1.64.1",
     "@tauri-apps/cli": "2.12.4",
+    "@types/canvas-confetti": "1.9.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",

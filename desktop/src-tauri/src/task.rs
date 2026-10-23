@@ -96,7 +96,7 @@ pub fn generate(
     let speed = 1_000.0 / pace;
     let points = route::resample(
         &route::corrected(points),
-        config.distance_km * 1_000.0 + 200.0,
+        config.distance_km * 1_000.0,
         speed * 3.0,
     )?;
     let mut traveled = 0.0;
@@ -284,7 +284,7 @@ mod tests {
             &json!({"rules":{"id":6,"spmin":180,"spmax":540}}),
         )
         .unwrap();
-        assert!((preview.distance_m - 4_200.0).abs() < 0.1);
+        assert!((preview.distance_m - 4_000.0).abs() < 0.1);
         assert!((900..=1_600).contains(&preview.duration_s));
         assert_eq!(preview.payload[0]["id"], 9);
         let tracks = preview.payload[0]["tracks"].as_array().unwrap();
@@ -303,6 +303,27 @@ mod tests {
         assert_eq!(count, preview.points.len());
         assert!(route::jumps(&preview.points) == 0);
     }
+    #[test]
+    fn generated_distance_matches_target_without_fixed_allowance() {
+        let points = route::parse(route::DEFAULT_ROUTE).unwrap();
+        for distance in ["1.2", "1.21", "4", "5"] {
+            let config = RunConfig::parse("1", distance, "2026-10-15", "08:00:00").unwrap();
+            let preview = generate(
+                &points,
+                &config,
+                "offline-test",
+                1_700_000_000_000,
+                &json!({"rules":{"id":6,"spmin":180,"spmax":540}}),
+            )
+            .unwrap();
+            assert!(
+                (preview.distance_m - config.distance_km * 1_000.0).abs() < 0.1,
+                "target {distance} km, generated {} m",
+                preview.distance_m
+            );
+        }
+    }
+
     #[test]
     fn cancelled_task_never_makes_network_request() {
         let session = Session::new().unwrap();

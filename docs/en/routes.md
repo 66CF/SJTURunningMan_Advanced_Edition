@@ -51,7 +51,7 @@ The route is copied into the **`routes/` folder in the OS user data directory** 
 ## Verifying a route
 
 1. Select it in the desktop "Select route" dropdown.
-2. Click "Preview actual track" (no login needed). The map opens by default; if collapsed, click "Open in map".
+2. The Workbench and Routes pages automatically preview the current per-run distance without login and update when you select another route. The map opens by default; if collapsed, click "Open in map".
 3. Check the OpenStreetMap embedded in the preview card:
    - Any red highlighted segment means a jump (> 150 m);
    - Whether the green start and red finish are close together;

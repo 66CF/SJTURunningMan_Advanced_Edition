@@ -183,6 +183,18 @@ ${scheme(light, lightTones)}
   --app-semester-progress-active-color: var(--md-sys-color-primary);
   --app-semester-progress-track-color: var(--md-sys-color-secondary-container);
 
+  /* Task completion celebration: shared palette and particle motion. */
+  --app-confetti-colors: #2979ff, #a142f4, #ffca28, #00c853, #ff4081;
+  --app-confetti-particles-per-side: 90;
+  --app-confetti-scalar: 1.4;
+  --app-confetti-emoji-per-side: 8;
+  --app-confetti-emoji-scalar: 2.8;
+  --app-confetti-spread: 65;
+  --app-confetti-velocity: 48;
+  --app-confetti-gravity: 1;
+  --app-confetti-ticks: 180;
+  --app-confetti-layer: 100;
+
   /* 图标字体 */
   --md-icon-font: 'Material Symbols Rounded';
   --app-sidebar-width: 248px;

@@ -10,7 +10,7 @@ interface RoutesPageProps {
   stale: boolean;
   busy: boolean;
   onSelect: (name: string) => void;
-  onPreview: () => void;
+  distanceKm: number;
   onOpenMap: () => Promise<PreviewMapResult | null>;
   onPlanner: () => void;
   onImport: () => void;
@@ -25,7 +25,7 @@ export function RoutesPage({
   stale,
   busy,
   onSelect,
-  onPreview,
+  distanceKm,
   onOpenMap,
   onPlanner,
   onImport,
@@ -82,7 +82,7 @@ export function RoutesPage({
         stale={stale}
         busy={busy}
         mode="routes"
-        onPreview={onPreview}
+        distanceKm={distanceKm}
         onOpenMap={onOpenMap}
         onPlanner={onPlanner}
         onDelete={onDelete}

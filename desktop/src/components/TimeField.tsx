@@ -77,7 +77,7 @@ export function TimeField({ value, onValueChange, disabled = false }: TimeFieldP
           onValueChange={() => undefined}
           disabled={disabled}
           readOnly
-          supportingText="12 小时制 · 随机浮动"
+          supportingText="12 小时制"
           trailingIcon={
             <md-icon-button
               aria-label="选择开始时间"

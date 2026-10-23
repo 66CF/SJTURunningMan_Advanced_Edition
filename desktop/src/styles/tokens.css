@@ -148,6 +148,9 @@
   --app-motion-duration-short: 150ms;
   --app-motion-duration-medium: 250ms;
   --app-motion-duration-long: 400ms;
+  /* Match md3.io's time picker entrance for the date dialog. */
+  --app-picker-enter-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --app-picker-enter-transform: translateY(20px) scale(0.9);
 
   /* Material Components Android progress tokens; dp mapped to CSS px. */
   --app-semester-progress-thickness: 4px;
@@ -159,6 +162,18 @@
   --app-semester-progress-stop-size: 4px;
   --app-semester-progress-active-color: var(--md-sys-color-primary);
   --app-semester-progress-track-color: var(--md-sys-color-secondary-container);
+
+  /* Task completion celebration: shared palette and particle motion. */
+  --app-confetti-colors: #2979ff, #a142f4, #ffca28, #00c853, #ff4081;
+  --app-confetti-particles-per-side: 90;
+  --app-confetti-scalar: 1.4;
+  --app-confetti-emoji-per-side: 8;
+  --app-confetti-emoji-scalar: 2.8;
+  --app-confetti-spread: 65;
+  --app-confetti-velocity: 48;
+  --app-confetti-gravity: 1;
+  --app-confetti-ticks: 180;
+  --app-confetti-layer: 100;
 
   /* 图标字体 */
   --md-icon-font: 'Material Symbols Rounded';

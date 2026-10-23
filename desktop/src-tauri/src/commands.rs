@@ -1234,6 +1234,19 @@ const UI_PROBE_SCRIPT: &str = r#"
       await wait(500);
     }
     result.checks.consentClosed = document.querySelectorAll('md-dialog[open]').length === 0;
+    result.checks.noWorkbenchCollapse = !Array.from(
+      document.querySelectorAll('.preview-card md-outlined-button'),
+    ).some((element) => element.textContent?.includes('收起地图'));
+    // 路线管理保留地图切换；先收起自动加载的地图，再验证重新展开。
+    document.querySelectorAll('.nav-item')[1]?.click();
+    await wait(1200);
+    const initialCollapse = Array.from(document.querySelectorAll('.preview-card md-outlined-button'))
+      .find((element) => element.textContent?.includes('收起地图'));
+    if (initialCollapse) {
+      (initialCollapse.shadowRoot?.querySelector('button') ?? initialCollapse).click();
+      await wait(250);
+    }
+    result.checks.routeMap = document.querySelectorAll('.map-line').length;
     // 预览地图应嵌在卡片里，而不是交给系统浏览器。
     const mapButton = Array.from(document.querySelectorAll('.preview-card md-outlined-button'))
       .find((element) => element.textContent?.includes('在地图中打开'));
@@ -1288,6 +1301,7 @@ const UI_PROBE_SCRIPT: &str = r#"
       'consentDialog',
       'consentChecked',
       'consentClosed',
+      'noWorkbenchCollapse',
       'mapButton',
       'inlineMap',
       'inlineMapReady',

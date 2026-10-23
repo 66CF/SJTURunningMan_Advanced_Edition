@@ -5,7 +5,13 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 840 } });
   await page.addInitScript({ path: 'e2e/mock-init.js' });
-  await page.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+  await page.addInitScript(() => {
+    window.__HOLD_MAP__ = true;
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = (command, ...args) =>
+      command === 'preview_map' && window.__HOLD_MAP__ ? Promise.resolve(null) : invoke(command, ...args);
+  });
+  await page.goto(process.env.E2E_BASE_URL || 'http://localhost:4173/', { waitUntil: 'networkidle' });
   await page.locator('md-dialog[open] md-checkbox').click();
   await page.locator('md-dialog[open] md-filled-button').click();
   await page.waitForTimeout(500);
@@ -13,7 +19,7 @@ try {
   await slider.focus();
   await slider.press('Home');
   await page.waitForTimeout(700);
-  assert.equal(await slider.getAttribute('aria-valuenow'), '0.1');
+  assert.equal(await slider.getAttribute('aria-valuenow'), '1.2');
   // Hold backend responses: geometry must continue updating without IPC completion.
   await page.evaluate(() => {
     const invoke = window.__TAURI_INTERNALS__.invoke;
@@ -41,6 +47,7 @@ try {
   await page.waitForTimeout(80);
   const reduced = await page.locator('.map-line').getAttribute('d');
   assert.equal(reduced, frames[0].path, 'shortening returns to the same endpoint; reduced motion settles immediately');
+  await page.evaluate(() => { window.__HOLD_MAP__ = false; });
   await page.locator('md-outlined-button').filter({ hasText: '在地图中打开' }).click();
   await page.waitForTimeout(300);
   const iframe = await page.locator('.route-map-frame').elementHandle();

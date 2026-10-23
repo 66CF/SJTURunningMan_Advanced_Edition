@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LoginPreparation } from '../lib/backend';
 import { Dialog } from '../components/Dialog';
 import { Notice } from '../components/Notice';
@@ -12,6 +12,7 @@ interface LoginDialogProps {
   notice: string;
   noticeKind: 'info' | 'error' | 'success';
   onRefresh: () => void;
+  onEdit: () => void;
   onSubmit: (username: string, password: string, captcha: string) => void;
   onCancel: () => void;
 }
@@ -24,6 +25,7 @@ export function LoginDialog({
   notice,
   noticeKind,
   onRefresh,
+  onEdit,
   onSubmit,
   onCancel,
 }: LoginDialogProps) {
@@ -31,6 +33,19 @@ export function LoginDialog({
   const [password, setPassword] = useState('');
   const [captcha, setCaptcha] = useState('');
   const [visible, setVisible] = useState(false);
+  const composing = useRef(false);
+  const submitting = useRef(false);
+  const canSubmit = !loading && Boolean(preparation && username.trim() && password && captcha.trim());
+
+  useEffect(() => {
+    if (!loading) submitting.current = false;
+    if (!open) composing.current = false;
+  }, [loading, open]);
+
+  const edit = (setValue: (value: string) => void, value: string) => {
+    setValue(value);
+    if (notice && noticeKind === 'error') onEdit();
+  };
 
   useEffect(() => {
     if (!open || stage === 2) {
@@ -45,8 +60,9 @@ export function LoginDialog({
   }, [open, stage, preparation]);
 
   const submit = () => {
-    if (loading) return;
-    onSubmit(username.trim(), password, captcha);
+    if (!canSubmit || composing.current || submitting.current) return;
+    submitting.current = true;
+    onSubmit(username.trim(), password, captcha.trim());
     setPassword('');
   };
 
@@ -59,10 +75,10 @@ export function LoginDialog({
       className="login-dialog"
       actions={
         <>
-          <md-text-button onClick={onCancel} disabled={loading}>
+          <md-text-button type="button" onClick={onCancel} disabled={loading}>
             取消
           </md-text-button>
-          <md-filled-button onClick={submit} disabled={loading}>
+          <md-filled-button type="button" onClick={submit} disabled={!canSubmit}>
             {loading ? '连接中…' : '登录'}
           </md-filled-button>
         </>
@@ -74,30 +90,37 @@ export function LoginDialog({
           event.preventDefault();
           submit();
         }}
+        onCompositionStart={() => { composing.current = true; }}
+        onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            submit();
-          }
+          if (event.key !== 'Enter') return;
+          // 输入法确认（含部分 WebView 的 keyCode 229）不代表提交。
+          if (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+          // 刷新验证码、显示密码等按钮保留自己的键盘操作。
+          if (!event.nativeEvent.composedPath().some((node) => node instanceof HTMLInputElement)) return;
+          event.preventDefault();
+          submit();
         }}
       >
         <p className="dialog-lead">凭据仅发送给学校认证服务，不保存在本地。</p>
         <TextField
           label="JAccount 账号"
           value={username}
-          onValueChange={setUsername}
+          onValueChange={(value) => edit(setUsername, value)}
           disabled={loading}
           name="username"
         />
         <TextField
           label="密码"
           value={password}
-          onValueChange={setPassword}
+          onValueChange={(value) => edit(setPassword, value)}
           password={!visible}
           disabled={loading}
           name="password"
           trailingIcon={
             <md-icon-button
+              type="button"
+              disabled={loading}
               aria-label={visible ? '隐藏密码' : '显示密码'}
               title={visible ? '隐藏密码' : '显示密码'}
               onClick={(event) => {
@@ -114,7 +137,7 @@ export function LoginDialog({
             <TextField
               label="验证码"
               value={captcha}
-              onValueChange={setCaptcha}
+              onValueChange={(value) => edit(setCaptcha, value)}
               disabled={loading}
               name="captcha"
             />
@@ -127,6 +150,7 @@ export function LoginDialog({
             )}
           </div>
           <md-outlined-icon-button
+            type="button"
             aria-label="刷新验证码"
             title="刷新验证码"
             onClick={(event) => {
@@ -139,7 +163,6 @@ export function LoginDialog({
           </md-outlined-icon-button>
         </div>
         {notice ? <Notice message={notice} kind={noticeKind} /> : null}
-        <button type="submit" className="visually-hidden" tabIndex={-1} aria-hidden="true" />
       </form>
     </Dialog>
   );

@@ -1,5 +1,6 @@
+import { MIN_DISTANCE_KM, MAX_DISTANCE_KM } from '../lib/distance';
 import { routeDisplayName } from '../lib/routeName';
-import type { PreviewMapResult, PreviewView, RouteDetail, RouteView } from '../lib/backend';
+import type { CalendarWeek, PreviewMapResult, PreviewView, RouteDetail, RouteView } from '../lib/backend';
 import { RoutePreviewCard } from '../components/RoutePreviewCard';
 import { SelectField, type SelectOption } from '../components/SelectField';
 import { SwitchField } from '../components/SwitchField';
@@ -15,6 +16,7 @@ export interface WorkbenchProps {
   distance: string;
   onDistanceChange: (value: string) => void;
   date: string;
+  weeks: CalendarWeek[];
   onDateChange: (value: string) => void;
   time: string;
   onTimeChange: (value: string) => void;
@@ -27,7 +29,6 @@ export interface WorkbenchProps {
   preview: PreviewView | null;
   stale: boolean;
   busy: boolean;
-  onPreview: () => void;
   onOpenMap: () => Promise<PreviewMapResult | null>;
 }
 
@@ -42,7 +43,7 @@ function planSummary(runs: string, distance: string, date: string, time: string)
   const count = Number(runs);
   const km = Number(distance);
   const countOk = Number.isInteger(count) && count >= 1 && count <= 30;
-  const distanceOk = Number.isFinite(km) && km >= 0.1 && km <= 5;
+  const distanceOk = Number.isFinite(km) && km >= MIN_DISTANCE_KM && km <= MAX_DISTANCE_KM;
 
   const title =
     countOk && distanceOk
@@ -102,6 +103,7 @@ export function WorkbenchPage(props: WorkbenchProps) {
                 disabled={props.busy}
               />
               <DateField
+                weeks={props.weeks}
                 value={props.date}
                 onValueChange={props.onDateChange}
                 disabled={props.busy}
@@ -145,7 +147,6 @@ export function WorkbenchPage(props: WorkbenchProps) {
         busy={props.busy}
         mode="workbench"
         distanceKm={Number(props.distance)}
-        onPreview={props.onPreview}
         onOpenMap={props.onOpenMap}
       />
     </div>
