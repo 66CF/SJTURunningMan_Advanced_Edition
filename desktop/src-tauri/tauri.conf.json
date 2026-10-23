@@ -49,8 +49,23 @@
     "linux": {
       "deb": {
         "depends": [
+          "libc6 (>= 2.39)",
+          "libgcc-s1",
+          "libx11-6",
+          "libx11-xcb1",
+          "libxcb1",
+          "libxcb-render0",
+          "libxcb-shm0",
+          "libxkbcommon0",
+          "libxkbcommon-x11-0",
+          "libxrandr2",
+          "libxi6",
+          "libxcursor1",
+          "libwayland-client0",
+          "libgtk-3-0",
           "libwebkit2gtk-4.1-0",
-          "libgtk-3-0"
+          "libjavascriptcoregtk-4.1-0",
+          "libsoup-3.0-0"
         ]
       }
     }

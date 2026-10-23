@@ -1,5 +1,6 @@
 """打包 Tauri 2 桌面产物；仅在构建机运行，不随应用分发。"""
 import argparse
+import json
 import os
 from pathlib import Path
 import plistlib
@@ -11,6 +12,22 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 ELF_MACHINES = {"amd64": 0x3E, "arm64": 0xB7}
+
+TAURI_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.conf.json"
+
+# Tauri 的 deb 配置没有 Recommends 字段，这一项只存在于手工打包的 control 里。
+DEB_RECOMMENDS = "xdg-desktop-portal, fonts-noto-cjk"
+
+
+def deb_depends():
+    """deb 依赖的唯一来源是 tauri.conf.json 的 bundle.linux.deb.depends。"""
+    config = json.loads(TAURI_CONFIG.read_text(encoding="utf-8"))
+    depends = config["bundle"]["linux"]["deb"]["depends"]
+    if not isinstance(depends, list) or not all(
+        isinstance(item, str) and item.strip() for item in depends
+    ):
+        raise ValueError(f"{TAURI_CONFIG.relative_to(ROOT)} has an invalid bundle.linux.deb.depends")
+    return [item.strip() for item in depends]
 
 
 def cargo_version():
@@ -81,10 +98,7 @@ def package(platform, binary, output, version, arch):
         (stage / "DEBIAN/control").write_text(
             f"Package: sjturunningman\nVersion: {version.replace('-', '~', 1)}\nArchitecture: {arch}\n"
             "Maintainer: Jacky Tang <tang.jie@live.com>\n"
-            "Depends: libc6 (>= 2.39), libgcc-s1, libx11-6, libx11-xcb1, libxcb1, libxcb-render0, "
-            "libxcb-shm0, libxkbcommon0, libxkbcommon-x11-0, libxrandr2, libxi6, libxcursor1, "
-            "libwayland-client0, libgtk-3-0, libwebkit2gtk-4.1-0, libjavascriptcoregtk-4.1-0, "
-            "libsoup-3.0-0\nRecommends: xdg-desktop-portal, fonts-noto-cjk\n"
+            f"Depends: {', '.join(deb_depends())}\nRecommends: {DEB_RECOMMENDS}\n"
             "Homepage: https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition\n"
             "Description: SJTU RunningMan Tauri desktop client\n"
             " Rust backend with a Material Design 3 interface (React 19 + @material/web).\n"
